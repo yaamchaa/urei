@@ -140,6 +140,7 @@ export function TimelineManagementPage() {
       console.log('저장 성공:', result);
 
       setMessage({ type: 'success', text: '✅ 추진 일정이 성공적으로 저장되었습니다.' });
+      await loadTimelineData();
       
       // 3초 후 메시지 자동 제거
       setTimeout(() => setMessage(null), 3000);

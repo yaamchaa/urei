@@ -28,7 +28,7 @@ const fallbackSupportCenters: SupportCenter[] = [
     intro:
       "분당 재건축 지원센터는 분당 신도시 재건축과 관련하여 시민이 필요한 정보를 확인하고 상담을 받을 수 있도록 운영하는 안내 창구입니다.",
     services:
-      "재건축 절차와 추진 단계 관련 기본 안내\n단지별 정비사업 관련 일반 문의 응대\n재건축 관련 민원 및 상담 창구 안내\n시민이 자주 묻는 사항에 대한 기초 정보 제공",
+      "재건축 절차와 추진 단계 관련 기본 안내<br>단지별 정비사업 관련 일반 문의 응대<br>재건축 관련 민원 및 상담 창구 안내<br>시민이 자주 묻는 사항에 대한 기초 정보 제공",
     hours: "평일 오전 9시 30분 ~ 오후 4시 30분",
     location: "분당구청 1층 종합민원실",
     contact: "방문 전 해당 부서 또는 성남시 대표 민원창구를 통해 운영 여부를 확인해 주세요.",
@@ -391,12 +391,12 @@ export function DashboardSelectionPage() {
                         </h3>
                       </div>
                       <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-                        {selectedCenter.services
-                          .split("\n")
-                          .map((service) => service.trim())
-                          .filter(Boolean)
-                          .map((service) => (
-                            <li key={service}>{service}</li>
+                         {(selectedCenter.services ?? "")
+                           .split(/\r?\n/)
+                           .map((service) => service.trim())
+                           .filter(Boolean)
+                           .map((service, index) => (
+                             <li key={`${service}-${index}`}>{service}</li>
                           ))}
                       </ul>
                     </section>
@@ -454,6 +454,7 @@ export function DashboardSelectionPage() {
                   >
                     닫기
                   </Button>
+                  
                 </div>
               </div>
             </div>

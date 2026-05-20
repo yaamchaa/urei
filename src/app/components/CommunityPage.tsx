@@ -12,6 +12,7 @@ import { Progress } from "./ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Switch } from "./ui/switch";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useUser } from "../contexts/UserContext";
 import { useAnyId } from "../contexts/AnyIdContext";
@@ -37,6 +38,8 @@ interface Question {
   status?: "pending" | "answered";
   answers?: QuestionAnswer[];
   created_at?: string;
+  is_private?: boolean;
+  author_id?: string;
 }
 
 interface Answer {
@@ -123,7 +126,11 @@ export function CommunityPage() {
   const location = useLocation();
   const { user, isLoggedIn, setUser } = useUser();
   const { isAuthenticated: anyIdAuthenticated, user: anyIdUser } = useAnyId();
-
+  const realName =
+  anyIdUser?.name?.trim() ||
+  user?.name?.trim() ||
+  "이름없음";
+  
   // URL 경로에서 카테고리 추출
   const getCategoryFromPath = () => {
     const path = location.pathname;
@@ -157,7 +164,7 @@ export function CommunityPage() {
   const [votingPoll, setVotingPoll] = useState<string | null>(null);
   const [userVotes, setUserVotes] = useState<{[pollId: string]: number}>({});  // 사용자가 투표한 선택지 기록
 
-  const [newQuestion, setNewQuestion] = useState({ title: "", content: "", category: "재건축" });
+  const [newQuestion, setNewQuestion] = useState({ title: "", content: "", category: "재건축", isPrivate: false });
   
   // 카테고리별 첫 번째 단지를 기본 선택값으로 설정
   const [selectedComplex, setSelectedComplex] = useState("");
@@ -293,13 +300,23 @@ export function CommunityPage() {
 
   const loadQuestions = async () => {
     try {
+      // 사용자 ID 가져오기 (비공개 질문 필터링용)
+      const userId = anyIdUser?.id || user?.id;
+
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${publicAnonKey}`,
+      };
+
+      // 사용자 ID가 있으면 헤더에 추가
+      if (userId) {
+        headers['X-User-ID'] = userId;
+      }
+
       // 카테고리별로 질문 필터링
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions?category=${category}`,
         {
-          headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
+          headers,
         }
       );
 
@@ -455,7 +472,7 @@ export function CommunityPage() {
           },
           body: JSON.stringify({
             complexId: selectedComplex,
-            author: user?.name ? user.name.substring(0, 1) + "**" : "익명",
+            author: realName,
             content: newMessage.trim()
           })
         }
@@ -511,7 +528,7 @@ export function CommunityPage() {
           },
           body: JSON.stringify({
             complexId: selectedComplex,
-            author: user?.name ? user.name.substring(0, 1) + "**" : "익명",
+            author: realName,
             content: replyContent.trim()
           })
         }
@@ -556,6 +573,9 @@ export function CommunityPage() {
     }
 
     try {
+      // 사용자 ID 가져오기 (Any-ID 또는 일반 사용자)
+      const authorId = anyIdUser?.id || user?.id || 'anonymous';
+
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions`,
         {
@@ -565,10 +585,12 @@ export function CommunityPage() {
             Authorization: `Bearer ${publicAnonKey}`,
           },
           body: JSON.stringify({
-            author: user?.name ? user.name.substring(0, 1) + "**" : "익명",
+            author: realName,
             title: newQuestion.title.trim(),
             content: newQuestion.content.trim(),
-            category: category // 현재 페이지의 카테고리 사용
+            category: category, // 현재 페이지의 카테고리 사용
+            is_private: newQuestion.isPrivate,
+            author_id: authorId
           })
         }
       );
@@ -588,6 +610,7 @@ export function CommunityPage() {
           title: "",
           content: "",
           category: "재건축",
+          isPrivate: false,
         });
 
         await loadQuestions(); // 질문 다시 로드
@@ -604,9 +627,9 @@ export function CommunityPage() {
   
   // 답변 제출 함수
   const handleSubmitAnswer = async (questionId: number) => {
-    // Any-ID 인증 체크
-    if (!anyIdAuthenticated && !isLoggedIn) {
-      alert("🔐 답변 작성은 Any-ID 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
+    // 관리자 인증 체크
+    if (!isLoggedIn || user?.role !== "admin") {
+      alert("🔐 센터톡톡 답변은 관리자만 작성할 수 있습니다.");
       return;
     }
 
@@ -622,7 +645,7 @@ export function CommunityPage() {
     }
 
     try {
-      const authorName = user?.name?.trim() || "익명";
+      const authorName = realName;
       
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions/${questionId}/answers`,
@@ -678,9 +701,7 @@ export function CommunityPage() {
           <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="qna">센터 톡톡</TabsTrigger>
             <TabsTrigger value="sms">바로문자</TabsTrigger>
-            <TabsTrigger value="chat" className="data-[state=inactive]:bg-green-100 data-[state=inactive]:text-green-700 data-[state=active]:bg-green-700">
-              소통방 톡톡
-            </TabsTrigger>
+            
           </TabsList>
 
           {/* 센터 톡톡 Tab */}
@@ -688,16 +709,43 @@ export function CommunityPage() {
             {/* Ask Question */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-blue-600" />
-                   질문하기<span className="text-sm opacity-75">- 센터에 물어 보면 담당자 답변</span>                
-                </CardTitle>
-              </CardHeader>
+                
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-6 h-6 text-blue-600" aria-hidden="true" />
+                센터에 물어 보면 답변
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                💬 본 게시판은 단순 문의 및 안내 게시판으로 민원 및 법령질의는 {" "} 
+                <a
+                href="https://www.epeople.go.kr/index.jsp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline hover:text-blue-800"
+              >
+                국민신문고 바로가기
+               </a>
+                를 이용하여 주시기 바랍니다.
+              </p>
+                <p className="text-sm text-gray-600">
+                💬 현재 플랫폼 시범운영 중으로 정식 개통 시 질문글 게시 가능합니다.
+              </p>
+            </CardHeader>
+              
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    제목 <span className="text-xs text-gray-500">({newQuestion.title.length}/50자)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      제목 <span className="text-xs text-gray-500">({newQuestion.title.length}/50자)</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm ${newQuestion.isPrivate ? 'text-gray-500' : 'font-semibold text-blue-600'}`}>공개</span>
+                      <Switch
+                        checked={newQuestion.isPrivate}
+                        onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, isPrivate: checked })}
+                      />
+                      <span className={`text-sm ${newQuestion.isPrivate ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>비공개</span>
+                    </div>
+                  </div>
                   <Input
                     placeholder="예: 재건축 관련 질문입니다"
                     value={newQuestion.title}
@@ -748,6 +796,12 @@ export function CommunityPage() {
                           <span className="font-semibold text-gray-900">{q.author}</span>
                           <span className="text-xs text-gray-500">{formatDateTime(q.created_at, q.date)}</span>
                           <Badge variant="outline" className="text-xs">{q.category}</Badge>
+                          {q.is_private && (
+                            <Badge variant="secondary" className="text-xs bg-gray-700 text-white">
+                              <EyeOff className="w-3 h-3 mr-1" />
+                              비공개
+                            </Badge>
+                          )}
                           {q.answers && q.answers.length > 0 && (
                             <Badge variant="secondary" className="text-xs">
                               <MessageSquare className="w-3 h-3 mr-1" />
@@ -802,7 +856,8 @@ export function CommunityPage() {
                         </div>
                       )}
 
-                      {/* 답변 입력창 */}
+                      {/* 답변 입력창 - 관리자만 보임*/}
+                    {user?.role === "admin" && (  
                       <div className="mt-3">
                         <label className="block text-xs text-gray-500 mb-1">
                           답변 ({answerContent.length}/500자)
@@ -826,12 +881,13 @@ export function CommunityPage() {
                           답변 등록
                         </Button>
                       </div>
-                    </div>
+                     )} 
+                    </div>                 
                   )}
                 </Card>
-                );
-              })}
-              
+               );
+             })}
+                            
               {/* 더 보기 버튼 */}
               {questions.length > visibleQuestionsCount && (
                 <div className="border-t pt-4">
@@ -967,7 +1023,7 @@ export function CommunityPage() {
                       key={complex.id}
                       variant={selectedComplex === complex.id ? "default" : "outline"}
                       onClick={() => handleComplexClick(complex.id)}
-                      className="h-auto py-3"
+                      className="h-auto py-3"                      
                     >
                       <div className="text-left">
                         <div className="font-semibold">{complex.name}</div>

@@ -316,8 +316,15 @@ export function DashboardSelectionManagementPage() {
                         <Textarea
                           id={`${prefix}-services`}
                           value={center.services}
-                          onChange={(e) => updateCenter(center.id, "services", e.target.value)}
+                          onChange={(e) => updateCenter(center.id, "services", e.target.value.replace(/\r\n/g, "\n")
+                        )                                
+                      }
                           rows={6}
+                          placeholder={`예시)
+                      재건축
+                      재개발
+                      가로주택정비`}
+                          maxLength={2000}
                         />
                       </div>
 

@@ -1,3 +1,8 @@
+/// <reference no-default-lib="true" />
+/// <reference lib="deno.ns" />
+/// <reference lib="deno.unstable" />
+/// <reference lib="esnext" />
+
 import { Hono } from "npm:hono";
 import { logger } from "npm:hono/logger";
 import { cors } from "npm:hono/cors";
@@ -332,8 +337,24 @@ function getBearerToken(c: any) {
   return authHeader.slice(7).trim();
 }
 
+// 🔒 CSRF 토큰 생성
+function generateCsrfToken(): string {
+  return crypto.randomUUID();
+}
+
+// 🔒 CSRF 토큰 검증
+async function verifyCsrfToken(c: any, adminSession: any): Promise<boolean> {
+  const csrfToken = c.req.header("X-CSRF-Token");
+
+  if (!csrfToken || !adminSession.csrfToken) {
+    return false;
+  }
+
+  return csrfToken === adminSession.csrfToken;
+}
+
 // 관리자 인증 확인 (세션 타임아웃 포함)
-async function requireAdminAuth(c: any) {
+async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
   const token = getBearerToken(c);
 
   if (!token) {
@@ -354,6 +375,20 @@ async function requireAdminAuth(c: any) {
         401,
       ),
     };
+  }
+
+  // 🔒 CSRF 토큰 검증 (state-changing 요청에만 필요)
+  if (requireCsrf) {
+    const isValidCsrf = await verifyCsrfToken(c, adminSession);
+    if (!isValidCsrf) {
+      return {
+        ok: false,
+        response: c.json(
+          { error: "Invalid CSRF token" },
+          403,
+        ),
+      };
+    }
   }
 
   // 🔒 세션 타임아웃 검증 (30분)
@@ -2326,6 +2361,30 @@ app.get("/make-server-66444bd0/questions", async (c) => {
     const categoryFilter = c.req.query("category");
     console.log("Category filter:", categoryFilter);
 
+    // 🔒 현재 사용자 인증 확인
+    let currentUserId: string | null = null;
+    let isAdmin = false;
+
+    // Admin 토큰 확인
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const adminSession = await kvGet(`admin_session:${token}`);
+      if (adminSession) {
+        isAdmin = true;
+        currentUserId = adminSession.adminId;
+        console.log("Request from admin:", currentUserId);
+      }
+    }
+
+    // 사용자 ID를 헤더로 받기 (Any-ID 또는 일반 사용자)
+    if (!currentUserId) {
+      currentUserId = c.req.header("X-User-ID") || null;
+      if (currentUserId) {
+        console.log("Request from user:", currentUserId);
+      }
+    }
+
     let questions = await kvGetByPrefix("question:");
 
     console.log(`Found ${questions.length} total questions`);
@@ -2339,6 +2398,28 @@ app.get("/make-server-66444bd0/questions", async (c) => {
         `Filtered to ${questions.length} questions for category: ${categoryFilter}`,
       );
     }
+
+    // 🔒 비공개 질문 필터링
+    questions = questions.filter((q: any) => {
+      // 공개 질문은 모두에게 표시
+      if (!q.is_private) {
+        return true;
+      }
+
+      // 비공개 질문은 작성자 또는 관리자만 볼 수 있음
+      if (isAdmin) {
+        return true;
+      }
+
+      if (currentUserId && q.author_id === currentUserId) {
+        return true;
+      }
+
+      // 그 외에는 비공개 질문 숨김
+      return false;
+    });
+
+    console.log(`After privacy filter: ${questions.length} questions`);
 
     // 시간 순으로 정렬 (최신순)
     questions.sort((a, b) => {
@@ -2360,7 +2441,7 @@ app.post("/make-server-66444bd0/questions", async (c) => {
 
   try {
     const body = await c.req.json();
-    const { author, title, content, category } = body;
+    const { author, title, content, category, is_private, author_id } = body;
 
     if (!author || !title || !content || !category) {
       return c.json(
@@ -2431,6 +2512,8 @@ app.post("/make-server-66444bd0/questions", async (c) => {
       status: "pending",
       answers: [],
       created_at: now.toISOString(),
+      is_private: is_private || false,
+      author_id: author_id || 'anonymous',
     };
 
     // kv_store에 저장
@@ -2896,6 +2979,12 @@ initializeImageBucket().catch(() => {});
 // POST /images/upload - 이미지 업로드
 app.post("/make-server-66444bd0/images/upload", async (c) => {
   console.log("POST /images/upload called");
+
+  // 🔒 관리자 인증 및 CSRF 토큰 검증
+  const authResult = await requireAdminAuth(c, true);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
 
   try {
     const body = await c.req.json();
@@ -3415,6 +3504,9 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
     // 관리자 세션 토큰 생성
     const adminApiToken = crypto.randomUUID();
 
+    // 🔒 CSRF 토큰 생성
+    const csrfToken = generateCsrfToken();
+
     // 관리자 세션 저장
     await kvSet(`admin_session:${adminApiToken}`, {
       adminId: adminId,
@@ -3423,6 +3515,7 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
       department: normalizedAdminData.department,
       isPrimaryAdmin: normalizedAdminData.isPrimaryAdmin,
       isActive: normalizedAdminData.isActive,
+      csrfToken: csrfToken, // 🔒 CSRF 토큰 추가
       createdAt: new Date().toISOString(),
     });
 
@@ -3437,6 +3530,7 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
       success: true,
       admin: adminInfo,
       adminApiToken,
+      csrfToken, // 🔒 CSRF 토큰 클라이언트에 반환
     });
   } catch (error: any) {
     console.error("Admin login error:", error);
@@ -3590,6 +3684,12 @@ app.delete(
   "/make-server-66444bd0/admin/accounts/:adminId",
   async (c) => {
     console.log("DELETE /admin/accounts/:adminId called");
+
+    // 🔒 관리자 인증 및 CSRF 토큰 검증
+    const authResult = await requireAdminAuth(c, true);
+    if (!authResult.ok) {
+      return authResult.response;
+    }
 
     try {
       const adminId = c.req.param("adminId");
@@ -4616,11 +4716,7 @@ app.get(
       );
 
       // CI로 사용자 조회 또는 생성
-      const userId = await findOrCreateUserByCi(
-        userInfo,
-        kvGet,
-        kvSet,
-      );
+      const userId = await findOrCreateUserByCi(userInfo);
 
       // 세션 생성
       const sessionId = crypto.randomUUID();
@@ -4705,6 +4801,113 @@ app.delete(
     }
   },
 );
+
+// ========================================
+// 안내 배너 관리 API
+// ========================================
+
+// GET /banner-content - 배너 내용 조회
+app.get("/make-server-66444bd0/banner-content", async (c) => {
+  console.log("GET /banner-content called");
+
+  try {
+    const bannerContent = await kvGet("banner:content");
+
+    if (!bannerContent) {
+      // 기본 데이터 반환
+      return c.json({
+        success: true,
+        content: {
+          title: "2026년 7월 2차 특별정비구역 지정 관련 안내",
+          subtitle: "연도별·분기별 흐름 + 중요 서류·동의문·선정 시점",
+          years: [],
+          designSummary: "",
+          constructionSummary: "",
+        },
+      });
+    }
+
+    return c.json({ success: true, content: bannerContent });
+  } catch (error: any) {
+    console.error("Banner content fetch error:", error);
+    return c.json(
+      { error: "배너 내용 조회 중 오류가 발생했습니다." },
+      500,
+    );
+  }
+});
+
+// POST /banner-content - 배너 내용 저장 (관리자만)
+app.post("/make-server-66444bd0/banner-content", async (c) => {
+  console.log("POST /banner-content called");
+
+  // 🔒 관리자 인증 및 CSRF 토큰 검증
+  const authResult = await requireAdminAuth(c, true);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+
+  try {
+    const body = await c.req.json();
+    const { content, adminName } = body;
+
+    if (!content) {
+      return c.json({ error: "content is required" }, 400);
+    }
+
+    // 🔒 Rate Limiting: 배너 저장 제한 (1분에 3회)
+    const userIdentifier = `banner:save:${adminName || "unknown"}`;
+    if (!checkRateLimit(userIdentifier, 3, 60000)) {
+      return c.json(
+        {
+          error:
+            "너무 많은 저장 요청을 하고 있습니다. 잠시 후 다시 시도해주세요.",
+        },
+        429,
+      );
+    }
+
+    // 🔒 XSS 방지: 모든 텍스트 필드 sanitization
+    const sanitizedContent = {
+      title: sanitizeHtml(content.title || ""),
+      subtitle: sanitizeHtml(content.subtitle || ""),
+      years: (content.years || []).map((year: any) => ({
+        year: sanitizeHtml(year.year || ""),
+        quarters: (year.quarters || []).map((quarter: any) => ({
+          quarter: sanitizeHtml(quarter.quarter || ""),
+          mainProgress: sanitizeHtml(quarter.mainProgress || ""),
+          documents: sanitizeHtml(quarter.documents || ""),
+          companies: sanitizeHtml(quarter.companies || ""),
+        })),
+      })),
+      designSummary: sanitizeHtml(content.designSummary || ""),
+      constructionSummary: sanitizeHtml(
+        content.constructionSummary || "",
+      ),
+    };
+
+    // KV 저장
+    await kvSet("banner:content", sanitizedContent);
+
+    // 🔒 보안 로그 기록 (콘솔)
+    console.log("🔒 Security Event: banner_update", {
+      eventType: "banner_update",
+      severity: "medium",
+      adminName: sanitizeHtml(adminName || "unknown"),
+      timestamp: new Date().toISOString(),
+      contentSize: JSON.stringify(sanitizedContent).length,
+    });
+
+    console.log("✅ Banner content saved by:", adminName);
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error("Banner content save error:", error);
+    return c.json(
+      { error: "배너 내용 저장 중 오류가 발생했습니다." },
+      500,
+    );
+  }
+});
 
 // 🔍 DEBUG: Catch-all route to see what path is being received
 app.all("*", (c) => {

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useUser } from "../contexts/UserContext";
 import { projectId } from "../../../utils/supabase/info";
 import { setAdminApiToken } from "../adminApi";
+import { setCsrfToken } from "../utils/csrf";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
@@ -63,6 +64,11 @@ export function AdminLoginPage() {
 
     if (data.adminApiToken) {
       setAdminApiToken(data.adminApiToken);
+    }
+
+    // 🔒 CSRF 토큰 저장
+    if (data.csrfToken) {
+      setCsrfToken(data.csrfToken);
     }
 
     setUser({

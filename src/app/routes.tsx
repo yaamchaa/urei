@@ -166,6 +166,10 @@ export const router = createHashRouter([
         lazy: () => import("./components/CommunityManagementPage").then(m => ({ Component: m.CommunityManagementPage }))
       },
       {
+        path: "banner-management",
+        lazy: () => import("./components/BannerManagementPage").then(m => ({ Component: m.BannerManagementPage }))
+      },
+      {
         path: "security-logs",
         lazy: () => import("./components/SecurityLogsPage").then(m => ({ Component: m.SecurityLogsPage }))
       },

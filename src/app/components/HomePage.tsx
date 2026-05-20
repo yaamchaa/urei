@@ -418,7 +418,7 @@ export function HomePage() {
             <p className="mb-6 text-blue-100">
               시민광장에서 다른 주민들과 소통하고, 전문가에게 질문하세요.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
               <Link to="/community" aria-label="시민광장으로 이동" className="no-underline">
                 <Button size="lg" variant="secondary" className="w-full">
                   <Users className="w-5 h-5 mr-2" aria-hidden="true" />
@@ -437,6 +437,18 @@ export function HomePage() {
                   시정소식 뉴스
                 </Button>
               </Link>
+
+              <a
+                href="https://seongnam.go.kr/urbanRenewal/urbanRenewalDistrictArea.do?menuIdx=1001109&returnURL=%2Fmain.do"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="정비구역 지번검색 외부 페이지 새 창 이동"
+                className="no-underline"
+              >
+               <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">               
+                정비구역 지번검색(새창)
+               </Button>
+              </a>
             </div>
           </CardContent>
         </Card>

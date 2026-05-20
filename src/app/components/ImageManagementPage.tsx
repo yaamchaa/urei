@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Building2, Layers, MapPin, Upload, Trash2, AlertCircle, Image as ImageIcon, FileText } from "lucide-react";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useUser } from "../contexts/UserContext";
+import { getCsrfToken } from "../utils/csrf";
 
 interface ImageData {
   aerial?: string;      // 조감도
@@ -101,6 +102,7 @@ export function ImageManagementPage() {
 
       try {
         // 서버에 업로드
+        const csrfToken = getCsrfToken();
         const response = await fetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/images/upload`,
           {
@@ -108,6 +110,7 @@ export function ImageManagementPage() {
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${publicAnonKey}`,
+              'X-CSRF-Token': csrfToken || '',
             },
             body: JSON.stringify({
               complex_id: selectedComplexId,

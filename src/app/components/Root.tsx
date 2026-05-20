@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from "react-router";
-import { Home, LayoutDashboard, Users, Newspaper, BookOpen, Menu, X, Settings, User, LogOut, MapPin, Phone, TrendingUp, UserCog, CalendarDays, DollarSign, BarChart3, School, Bus, FileText, Rss, ChevronDown, ChevronRight, Building2, Image, Info, Car, Layers, LineChart, Shield } from "lucide-react";
+import { Home, LayoutDashboard, Users, Newspaper, BookOpen, Menu, X, Settings, User, LogOut, MapPin, Phone, TrendingUp, UserCog, CalendarDays, DollarSign, BarChart3, School, Bus, FileText, Rss, ChevronDown, ChevronRight, Building2, Image, Info, Car, Layers, LineChart, Shield, Bell } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import seongnamLogo from "figma:asset/6618bbf3a75e67ab50721119f6e09d28ed4f0e9b.png";
 import { useUser } from "../contexts/UserContext";
@@ -9,6 +9,7 @@ import { SessionTimeoutWarning } from "./SessionTimeoutWarning";
 import { AnalyticsWrapper } from "./AnalyticsWrapper";
 import { AnyIdWelcomeDialog } from "./AnyIdWelcomeDialog";
 import { AnyIdAuthDialog } from "./AnyIdAuthDialog";
+import { clearCsrfToken } from "../utils/csrf";
 
 export function Root() {
   const location = useLocation();
@@ -21,6 +22,7 @@ export function Root() {
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
   const settingsMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { user, logout, isLoggedIn } = useUser();
   const { isAuthenticated: anyIdAuthenticated } = useAnyId();
   const [anyIdDialogOpen, setAnyIdDialogOpen] = useState(false);
@@ -39,6 +41,48 @@ export function Root() {
       behavior: 'instant'
     });
   }, [location.pathname]);
+
+  // 모바일 메뉴 포커스 트랩
+  useEffect(() => {
+    if (!mobileMenuOpen || !mobileMenuRef.current) return;
+
+    const mobileMenu = mobileMenuRef.current;
+    const focusableElements = mobileMenu.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0] as HTMLElement;
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    // 메뉴가 열릴 때 첫 번째 요소에 포커스
+    firstElement.focus();
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    mobileMenu.addEventListener('keydown', handleTabKey);
+
+    return () => {
+      mobileMenu.removeEventListener('keydown', handleTabKey);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -91,6 +135,7 @@ export function Root() {
 
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
+      clearCsrfToken();
       logout();
       setUserMenuOpen(false);
       alert("✅ 로그아웃되었습니다.");
@@ -118,8 +163,7 @@ export function Root() {
     { path: "/parking-management", icon: Car, label: "주차 개선 관리" },
     { path: "/floors-management", icon: Building2, label: "예상 층수 관리" },
     { path: "/floor-area-ratio-management", icon: Layers, label: "용적률 관리" },
-    { path: "/image-management", icon: Image, label: "조감도/배치도/구역계" },
-    { path: "/timeline-management", icon: CalendarDays, label: "단지별 추진 일정" },
+    { path: "/image-management", icon: Image, label: "조감도/배치도/구역계" },    
     { path: "/school-management", icon: School, label: "학군 정보 관리" },
     { path: "/transport-management", icon: Bus, label: "교통 정보 관리" },
     { path: "/notes-management", icon: FileText, label: "비고 관리" },
@@ -127,6 +171,7 @@ export function Root() {
     { path: "/community-management", icon: Users, label: "시민광장 관리" },
     { path: "/newsfeed-management", icon: Rss, label: "시정소식 관리" },
     { path: "/guide-management", icon: BookOpen, label: "가이드 관리" },
+    { path: "/banner-management", icon: Bell, label: "안내 배너 관리" },
     { path: "/analytics-management", icon: LineChart, label: "통계" },
   ];
 
@@ -160,7 +205,7 @@ export function Root() {
   const isSettingsActive = ["/progress-management", "/contribution-management",
     "/timeline-management", "/poll-management", "/school-management",
     "/transport-management", "/notes-management", "/newsfeed-management", "/login-management", "/image-management",
-    "/basic-info-management", "/parking-management", "/floors-management", "/floor-area-ratio-management", "/analytics-management", "/community-management", "/security-logs"].includes(location.pathname);
+    "/basic-info-management", "/parking-management", "/floors-management", "/floor-area-ratio-management", "/analytics-management", "/community-management", "/security-logs", "/banner-management"].includes(location.pathname);
 
   return (
     <div className="min-h-screen bg-gray-50 w-full max-w-full">
@@ -179,7 +224,7 @@ export function Root() {
                 />
               </div>
               <div>
-                <span className="font-bold text-gray-900 text-[20px]">성남시 개발 톡톡(talk talk)</span>
+                <span className="font-bold text-gray-900 text-[20px]">성남시 개발톡톡(talktalk)</span>
               </div>
             </Link>
 
@@ -380,7 +425,7 @@ export function Root() {
           </div>
 
           {mobileMenuOpen && (
-            <nav className="md:hidden py-4 border-t border-gray-200" aria-label="모바일 주메뉴">
+            <nav ref={mobileMenuRef} className="md:hidden py-4 border-t border-gray-200" aria-label="모바일 주메뉴">
               {isLoggedIn && user && (
                 <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                   <div className="flex items-center gap-3 mb-3">
@@ -469,11 +514,11 @@ export function Root() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-              <h2 className="font-bold text-gray-900 mb-3">성남시 개발 톡톡(talk talk)</h2>
+              <h2 className="font-bold text-gray-900 mb-3">성남시 개발톡톡(talktalk)</h2>
               <p className="text-sm text-gray-600">
                 성남시 재개발, 재건축 정보 소통 플랫폼
                 <br />
-                성남 개발 소식 "손안에서 톡톡"
+                성남 개발 소식 "손안에서"
               </p>
             </div>
             <div>
@@ -481,7 +526,7 @@ export function Root() {
               <address className="text-sm text-gray-600 not-italic">
                 분당구 재건축지원센터 031-729-7225~8
                 <br />
-                원도심 재개발재건축지원센터 031-729-1746
+                원도심 재개발·재건축지원센터 031-729-1746~7
               </address>
             </div>
             <div>

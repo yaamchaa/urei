@@ -68,6 +68,9 @@ export function DashboardPage() {
   const [serverDetailedProgress, setServerDetailedProgress] = useState<any>(null);
   const [serverTimeline, setServerTimeline] = useState<any[]>([]);
 
+  // 배너 내용 상태 (서버에서 로드)
+  const [bannerContent, setBannerContent] = useState<any>(null);
+
   // 이미지 상태
   const [complexImages, setComplexImages] = useState<{
     aerial?: string;
@@ -82,12 +85,48 @@ export function DashboardPage() {
     document.body.scrollTop = 0;
   }, []);
 
+  // 배너 내용 로드
+  useEffect(() => {
+    const loadBannerContent = async () => {
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/banner-content`,
+          {
+            headers: {
+              Authorization: `Bearer ${publicAnonKey}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setBannerContent(data.content);
+        }
+      } catch (error) {
+        console.error("배너 내용 로드 오류:", error);
+      }
+    };
+
+    loadBannerContent();
+  }, []);
+
   // URL 파라미터가 변경되면 선택된 단지 업데이트
   useEffect(() => {
     if (id) {
       setSelectedComplex(id);
     }
   }, [id]);
+
+  // 단지 목록이 바뀌면 첫 번째 단지를 기본 선택
+  useEffect(() => {
+    if (!filteredComplexes.length) return;
+
+    const exists = filteredComplexes.some((complex) => complex.id === selectedComplex);
+
+    if (!selectedComplex || !exists) {
+      setSelectedComplex(filteredComplexes[0].id);
+    }
+  }, [filteredComplexes, selectedComplex]);
 
   // 이미지 로드
   useEffect(() => {
@@ -487,14 +526,16 @@ export function DashboardPage() {
           <p className="text-gray-600">단지 및 구역별 맞춤 정보를 한눈에 확인하세요</p>
         </div>
 
-        {/* 2차 특별정비구역 안내 배너 */}
-        <Card className="mb-6 bg-blue-50 border-blue-200 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setSpecialDistrictDialogOpen(true)}>
-          <CardContent className="py-4">
-            <p className="text-sm text-blue-800">
-              📅 <strong>2026년 7월 2차 특별정비구역 지정 관련 안내</strong> (2차 특별정비구역 상세 정보 보기)
-            </p>
-          </CardContent>
-        </Card>
+        {/* 2차 특별정비구역 안내 배너 - 분당 재건축 카테고리에서만 표시 */}
+        {category === 'bundang' && (
+          <Card className="mb-6 bg-blue-50 border-blue-200 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setSpecialDistrictDialogOpen(true)}>
+            <CardContent className="py-4">
+              <p className="text-sm text-blue-800">
+                📅 <strong>2026년 7월 2차 특별정비구역 지정 관련 안내</strong> (2차 특별정비구역 상세 정보 보기)
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Complex Selector */}
         <Card className="mb-6">
@@ -507,7 +548,7 @@ export function DashboardPage() {
                 </label>
                 <Select value={selectedComplex} onValueChange={setSelectedComplex}>
                   <SelectTrigger className="w-full md:w-64 text-white border-blue-500 hover:bg-blue-500 [&>svg]:text-white bg-blue-600">
-                    <SelectValue />
+                    <SelectValue placeholder="단지 및 구역 선택" />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredComplexes.map(c => (
@@ -519,7 +560,7 @@ export function DashboardPage() {
                 </Select>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">재건축 진행률</p>
+                <p className="text-sm text-gray-600">진행률</p>
                 <p
                   className="text-3xl font-bold transition-colors duration-500"
                   style={{
@@ -560,7 +601,7 @@ export function DashboardPage() {
               <p className="text-2xl font-bold text-gray-900">{totalHouseholdsBefore} → {totalHouseholdsAfter}</p>
               <p className="text-xs text-gray-500 mt-2">세대정보</p>
               {subDistricts.length > 0 && (
-                <p className="text-sm text-blue-600 mt-2 font-bold">(단지 기본 정보 상세보기)</p>
+                <p className="text-sm text-blue-600 mt-2 font-bold">(단지 및 구역 기본 정보 상세보기)</p>
               )}
             </CardContent>
           </Card>
@@ -813,7 +854,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {getTimeline(complex.id).map((item, idx) => (
+              {displayedTimeline.map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
                     item.status === 'completed' ? 'bg-green-500' :
@@ -982,7 +1023,7 @@ export function DashboardPage() {
 
       {/* 세대 상세 Dialog */}
       <Dialog open={householdsDialogOpen} onOpenChange={setHouseholdsDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-6xl max-h-[90vh] overflow-y-auto scrollbar-hide">
+        <DialogContent className="max-w-[95vw] sm:max-w-6xl max-h-[90vh] overflow-auto scrollbar-hide">
           <DialogHeader className="text-left">
             <DialogTitle className="flex items-center gap-2 text-left">
               <Home className="w-5 h-5 text-blue-600" />
@@ -995,7 +1036,7 @@ export function DashboardPage() {
           {subDistricts.length > 0 && (
             <div className="space-y-4">
               {/* 테이블 - 가로 스크롤 가능 */}
-              <div className="overflow-x-auto -mx-6 px-6">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[1200px]">
                   <thead>
                     <tr className="border-b-2 border-gray-300 bg-gray-50">
@@ -1008,7 +1049,7 @@ export function DashboardPage() {
                       <th className="text-left py-3 px-3 font-semibold text-gray-700 whitespace-nowrap">사업방식</th>
                       <th className="text-left py-3 px-3 font-semibold text-gray-700 whitespace-nowrap">시공사</th>
                       <th className="text-right py-3 px-3 font-semibold text-gray-700 whitespace-nowrap">기존 세대</th>
-                      <th className="text-right py-3 px-3 font-semibold text-gray-700 whitespace-nowrap">재건축 후</th>
+                      <th className="text-right py-3 px-3 font-semibold text-gray-700 whitespace-nowrap">계획 세대</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1037,11 +1078,11 @@ export function DashboardPage() {
               {/* 요약 */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-xs text-gray-600 mb-1">재건축 전 총 세대수</p>
+                  <p className="text-xs text-gray-600 mb-1">기존 총 세대수</p>
                   <p className="text-2xl font-bold text-blue-600">{totalHouseholdsBefore}</p>
                 </div>
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-xs text-gray-600 mb-1">재건축 후 총 세대수</p>
+                  <p className="text-xs text-gray-600 mb-1">계획 총 세대수</p>
                   <p className="text-2xl font-bold text-green-600">{totalHouseholdsAfter}</p>
                 </div>
               </div>
@@ -1166,353 +1207,84 @@ export function DashboardPage() {
       <Dialog open={specialDistrictDialogOpen} onOpenChange={setSpecialDistrictDialogOpen}>
         <DialogContent className="w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-2xl pr-8">2026년 7월 2차 특별정비구역 지정 관련 안내</DialogTitle>
+            <DialogTitle className="text-lg sm:text-2xl pr-8">
+              {bannerContent?.title || "2026년 7월 2차 특별정비구역 지정 관련 안내"}
+            </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              연도별·분기별 흐름 + 중요 서류·동의문·선정 시점
+              {bannerContent?.subtitle || "연도별·분기별 흐름 + 중요 서류·동의문·선정 시점"}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-8 py-4">
-            {/* 2026년 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                2026년
-              </h3>
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2026.Q1~2026.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">준비위원회 활성화, 신탁 협약·주요 구조 논의</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 통합 재건축 준비위원회 구성<br/>
-                        - 한국토지신탁과 업무협약(MOU)
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·사업관리 업체 초기 논의</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2026.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">2차 특별정비구역 신청 준비, 주민설명회 개최</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 통합 특별정비계획(안) 관련 설명자료<br/>
-                        - 특별정비구역지정 제안 동의서(전자 동의서 형식)
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비업체·도시계획·정비용역사 선정 준비</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2026.Q3</td>
-                      <td className="border border-gray-300 px-4 py-3">7월 1~10일 초안 접수, 2차 특별정비구역 지정 추진</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 성남시 2차 특별정비구역 지정 초안 제출서류<br/>
-                        - 토지등소유자 특별정비구역지정 동의서<br/>
-                        - 통합 특별정비구역·사업방향 안내서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·정비용역사(정비업체) 선정(입찰·공고·협약, 2026.Q3~Q4)</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2026.Q4</td>
-                      <td className="border border-gray-300 px-4 py-3">지정 고시 후 기본계획·정비계획(안) 수립</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 정비계획(안) 공람·공고, 주민설명회<br/>
-                        - 특별정비계획 의견서 접수서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비업체가 도시계획·정비설계 기본안 수립 시작</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {bannerContent && bannerContent.years && bannerContent.years.length > 0 ? (
+              // 서버에서 로드한 데이터 표시
+              <>
+                {bannerContent.years.map((yearData: any, yearIndex: number) => (
+                  <div key={yearIndex}>
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <Calendar className="w-6 h-6 text-blue-600" />
+                      {yearData.year}
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
+                        <thead>
+                          <tr className="bg-blue-50">
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {yearData.quarters && yearData.quarters.map((quarter: any, qIndex: number) => (
+                            <tr key={qIndex} className={qIndex % 2 === 1 ? "bg-gray-50" : ""}>
+                              <td className="border border-gray-300 px-4 py-3 font-medium">{quarter.quarter}</td>
+                              <td className="border border-gray-300 px-4 py-3">{quarter.mainProgress}</td>
+                              <td className="border border-gray-300 px-4 py-3 text-sm whitespace-pre-line">
+                                {quarter.documents}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-sm whitespace-pre-line">
+                                {quarter.companies}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
 
-            {/* 2027년 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                2027년
-              </h3>
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2027.Q1~2027.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">정비계획(안) 변경·정비계획 확정 준비</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 정비계획(안) 변경·보완 자료<br/>
-                        - 공람·의견서 반영보고서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·정비용역사(설계회사·도시계획가), 정비업체 계약</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2027.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">정비계획·정비구역 고시, 신탁 방식 사업시행 구조 확정</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 정비계획·정비구역 고시문<br/>
-                        - 신탁사업시행 동의서·주주총회(신탁사) 자료
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비업체가 정비계획·정비설계 기본안(안) 완료</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2027.Q3</td>
-                      <td className="border border-gray-300 px-4 py-3">사업시행계획 수립, 분양구조·분담금 예시안 초안</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 사업시행계획(안)<br/>
-                        - 분양·공공기여 구조 설명서<br/>
-                        - 이주대책·이주비 대출 구조 설명서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·사업관리·용역사가 분양·공사비·이주비 계획 수립</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2027.Q4</td>
-                      <td className="border border-gray-300 px-4 py-3">사업시행계획 주민공람·설명회, 주요 구조 확정</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 사업시행계획 공람·의견서 제출서<br/>
-                        - 분양구조·분담금 예시 동의(비공식) 의견서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비업체·설계회사가 실시설계 기본안 준비 중</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                {/* 설계·업체 선정 시점 요약 */}
+                {(bannerContent.designSummary || bannerContent.constructionSummary) && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      "설계·업체 선정 시점" 요약
+                    </h3>
 
-            {/* 2028년 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                2028년
-              </h3>
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2028.Q1~2028.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">관리처분계획 수립 시작, 조합원·일반분양 구조 최종화</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 관리처분계획(안)<br/>
-                        - 조합원·토지등소유자별 분담금·분양안 표<br/>
-                        - 토지등소유자 분양가 65% 구조 설명서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·설계회사가 관리처분 계획안·도면(초안) 준비</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2028.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">관리처분계획 공람·주민설명회, 이주·철거 일정 안내</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 관리처분계획 공람·공고문<br/>
-                        - 이주비·임시주거·전문이주대행 안내문
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 이주·철거·조경·환경 업체 사전 검토</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2028.Q3</td>
-                      <td className="border border-gray-300 px-4 py-3">관리처분계획 인가, 토지등소유자 동의 확보</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 토지등소유자 관리처분계획 동의서<br/>
-                        - 토지·건물 권리 이전·대장정리서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·설계회사가 관리처분 계획(도면·감정평가반영) 완료</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2028.Q4</td>
-                      <td className="border border-gray-300 px-4 py-3">공사 준비, 철거·이주비대출·분양권 대출 구조 확정</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 이주비·분양권·중도금 대출 구조 협약서<br/>
-                        - 이주·철거·안전 점검·공사장 계획서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 철거·토목·안전 업체 선정(2028.Q4~2029.Q1)</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    <div className="space-y-4">
+                      {bannerContent.designSummary && (
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2">설계 (정비·건축·도시계획)</h4>
+                          <div className="text-sm text-gray-700 whitespace-pre-line">
+                            {bannerContent.designSummary}
+                          </div>
+                        </div>
+                      )}
 
-            {/* 2029년 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                2029년
-              </h3>
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2029.Q1~2029.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">이주·철거, 지반보강·공사장 조성</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 이주비·임시주거비 지급계산서<br/>
-                        - 철거·안전관리 계획 승인서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 철거·지반보강·토목 업체 계약, 공사장 조성 공사 시작</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2029.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">정비·건축 설계 확정(확정설계), 
-                        감리·감정평가 선정</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 확정설계(도면·사양·마감)<br/>
-                        - 건물신축·공사비 검토서(GOV·감정평가)<br/>
-                        - 감리·감정평가 계약서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 정비·건축·구조·설비·조경 등 설계사 확정 계약<br/>
-                        - 건설·감리사 선정(입찰·공고)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2029.Q3</td>
-                      <td className="border border-gray-300 px-4 py-3">시공사 선정 및 공사계약 체결, 
-                        공동주택 공사비 확정</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 시공자 선정 결과·입찰 공고문<br/>
-                        - 공사계약서(PC·GC)<br/>
-                        - 공사비·지불계획표
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 대형 종합건설사(예: LH·대형 시공사)와 공사계약 체결</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2029.Q4</td>
-                      <td className="border border-gray-300 px-4 py-3">공사 착공, 분양권·중도금·
-                        분담금 납부 개시</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 공사 착공·준공 예정일 공고문<br/>
-                        - 조합원·일반분양자 분담금 납부 안내서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 공사 시행, 분양권·중도금 납부·분담금 관리 시작</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* 2030년 이후 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                2030년 이후 (준공·입주)
-              </h3>
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full border-collapse border border-gray-300 min-w-[800px]">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">연도/분기</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">주요 진행사항</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">중요 서류·동의문·절차</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">설계·정비·시공 업체 등</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2030.Q1~2031.Q2</td>
-                      <td className="border border-gray-300 px-4 py-3">신축 공사 및 기반 시설 진행, 준공 검사 준비</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 공사 진행·안전점검·변경 내역서<br/>
-                        - 준공검사·검토 자료
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 공사·감리·전문검사 업체가 준공 준비</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2031.Q3</td>
-                      <td className="border border-gray-300 px-4 py-3">준공·입주·분양권 정산</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 공사 준공·입주 통지서<br/>
-                        - 분양권·중도금·분담금 정산서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 공사·분양·관리 업체가 최종 납입·청산</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-3 font-medium">2031.Q4~2032.Q1</td>
-                      <td className="border border-gray-300 px-4 py-3">최종 정산·청산, 정비사업 종료</td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">
-                        - 정비사업청산결과보고서<br/>
-                        - 토지·건물·권리 종료 고지서
-                      </td>
-                      <td className="border border-gray-300 px-4 py-3 text-sm">- 정비·관리·법무 업체가 청산 종료 지원</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* 설계·업체 선정 시점 요약 */}
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                "설계·업체 선정 시점" 요약
-              </h3>
-
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">설계(정비·건축·도시계획)</h4>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 font-bold">•</span>
-                      <span>
-                        <strong>정비·정비용역사(정비업체):</strong> 2026.Q3~Q4 특별정비계획 수립 시기부터 선정,
-                        2027년까지 정비설계(도시·용적률·공공기여 등) 진행
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 font-bold">•</span>
-                      <span>
-                        <strong>건축·구조·조경·설비 설계사:</strong> 2028.Q1~2029.Q1 관리처분·사업시행계획 수립 단계에서
-                        정비업체·신탁사가 동시 선정 또는 별도 입찰
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">시공사(건설사)</h4>
-                  <ul className="space-y-2 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 font-bold">•</span>
-                      <span>
-                        정비법상 일반적으로 "조합설립 이후 또는 사업시행인가 이후"
-                        (성남시 기준으로는 일반적으로 <strong>2029.Q2~Q3</strong> 수준)에 입찰·선정
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 font-bold">•</span>
-                      <span>
-                        신탁 방식은 신탁사(한국토지신탁) 주도로 대형건설사와 협의·입찰하게 됨
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+                      {bannerContent.constructionSummary && (
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2">시공사 (건설사)</h4>
+                          <div className="text-sm text-gray-700 whitespace-pre-line">
+                            {bannerContent.constructionSummary}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
