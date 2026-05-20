@@ -2368,26 +2368,24 @@ app.get("/make-server-66444bd0/questions", async (c) => {
     let currentUserId: string | null = null;
     let isAdmin = false;
 
-    // Admin 토큰 확인 (anon key가 아닌 경우만)
+    // Admin 토큰 확인 (시민광장 관리에서 사용)
     const authHeader = c.req.header("Authorization");
-    if (authHeader?.startsWith("Bearer ") && authHeader.length > 50) {
+    if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
-      // Supabase anon key가 아닌 경우에만 admin session 확인
-      if (!token.startsWith("eyJ")) {
-        try {
-          const adminSession = await kvGet(`admin_session:${token}`);
-          if (adminSession) {
-            isAdmin = true;
-            currentUserId = adminSession.adminId;
-            console.log("Request from admin:", currentUserId);
-          }
-        } catch (error) {
-          console.log("Admin session check failed:", error);
+
+      try {
+        const adminSession = await kvGet(`admin_session:${token}`);
+        if (adminSession && adminSession.adminId) {
+          isAdmin = true;
+          currentUserId = adminSession.adminId;
+          console.log("✅ Request from admin:", currentUserId);
         }
+      } catch (error) {
+        // Admin 세션이 없으면 일반 사용자로 처리
       }
     }
 
-    // 사용자 ID를 헤더로 받기 (Any-ID 또는 일반 사용자)
+    // 일반 사용자 ID를 헤더로 받기 (Any-ID 또는 일반 사용자)
     if (!currentUserId) {
       currentUserId = c.req.header("X-User-ID") || null;
       if (currentUserId) {
@@ -2395,6 +2393,7 @@ app.get("/make-server-66444bd0/questions", async (c) => {
       }
     }
 
+    console.log("Fetching questions from KV store...");
     let questions = await kvGetByPrefix("question:");
 
     console.log(`Found ${questions.length} total questions`);
