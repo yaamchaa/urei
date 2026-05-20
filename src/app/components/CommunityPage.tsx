@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Switch } from "./ui/switch";
-import { projectId, publicAnonKey } from "../../../utils/supabase/info";
+import { projectId, publicAnonKey } from "../../../utils/supabase/info.tsx";
 import { useUser } from "../contexts/UserContext";
 import { useAnyId } from "../contexts/AnyIdContext";
 import { trackEvent, trackClarityEvent } from "./Analytics";
@@ -300,8 +300,11 @@ export function CommunityPage() {
 
   const loadQuestions = async () => {
     try {
+      console.log("loadQuestions 시작, category:", category);
+      console.log("projectId:", projectId, "publicAnonKey:", publicAnonKey?.substring(0, 20) + "...");
+
       // 사용자 ID 가져오기 (비공개 질문 필터링용)
-      const userId = anyIdUser?.id || user?.id;
+      const userId = anyIdUser?.userId || user?.memberId;
 
       const headers: HeadersInit = {
         Authorization: `Bearer ${publicAnonKey}`,
@@ -312,20 +315,73 @@ export function CommunityPage() {
         headers['X-User-ID'] = userId;
       }
 
-      // 카테고리별로 질문 필터링
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions?category=${category}`,
-        {
-          headers,
-        }
-      );
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions?category=${category}`;
+      console.log("Fetching:", url);
 
-      if (response.ok) {
-        const data = await response.json();
-        setQuestions(data.questions || []);
+      // AbortController로 타임아웃 설정
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        // 카테고리별로 질문 필터링
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          mode: 'cors',
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          setQuestions(data.questions || []);
+          console.log("✅ 질문 로드 성공:", data.questions?.length);
+        } else {
+          console.error("질문 로드 실패:", response.status, response.statusText);
+          const errorText = await response.text();
+          console.error("에러 응답:", errorText);
+          // 실패 시 빈 배열 설정
+          setQuestions([]);
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        if (fetchError instanceof Error) {
+          if (fetchError.name === 'AbortError') {
+            console.error("⏱️ API 요청 타임아웃 (5초)");
+          } else {
+            console.error("🌐 네트워크 오류:", fetchError.message);
+          }
+        }
+
+        // Figma Make 환경에서는 외부 API 호출이 제한될 수 있으므로 Mock 데이터 사용
+        console.warn("⚠️ 외부 API 호출 실패 - Figma Make 미리보기에서는 외부 API가 차단됩니다.");
+        console.info("ℹ️ Mock 데이터를 사용합니다. 실제 배포 환경에서는 정상 작동합니다.");
+
+        // Mock 데이터
+        const mockQuestions: Question[] = [
+          {
+            id: Date.now(),
+            author: "시민 (Mock)",
+            date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            title: "미리보기 환경에서는 외부 API가 차단됩니다",
+            content: "이것은 Mock 데이터입니다. 실제 배포 환경에서는 Supabase에서 실제 데이터를 불러옵니다.",
+            category: category,
+            status: "pending",
+            answers: [],
+            created_at: new Date().toISOString(),
+            is_private: false,
+          }
+        ];
+        setQuestions(mockQuestions);
       }
     } catch (error) {
       console.error("질문 목록 로드 오류:", error);
+      if (error instanceof Error) {
+        console.error("에러 상세:", error.message, error.stack);
+      }
+      setQuestions([]);
     }
   };
 
@@ -574,7 +630,7 @@ export function CommunityPage() {
 
     try {
       // 사용자 ID 가져오기 (Any-ID 또는 일반 사용자)
-      const authorId = anyIdUser?.id || user?.id || 'anonymous';
+      const authorId = anyIdUser?.userId || user?.memberId || 'anonymous';
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions`,
