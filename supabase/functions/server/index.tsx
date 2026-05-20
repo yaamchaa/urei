@@ -651,10 +651,13 @@ app.use(
       "Authorization",
       "apikey",
       "x-client-info",
+      "X-User-ID",
+      "X-CSRF-Token",
     ],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,
+    credentials: true,
   }),
 );
 
@@ -2365,15 +2368,22 @@ app.get("/make-server-66444bd0/questions", async (c) => {
     let currentUserId: string | null = null;
     let isAdmin = false;
 
-    // Admin 토큰 확인
+    // Admin 토큰 확인 (anon key가 아닌 경우만)
     const authHeader = c.req.header("Authorization");
-    if (authHeader?.startsWith("Bearer ")) {
+    if (authHeader?.startsWith("Bearer ") && authHeader.length > 50) {
       const token = authHeader.substring(7);
-      const adminSession = await kvGet(`admin_session:${token}`);
-      if (adminSession) {
-        isAdmin = true;
-        currentUserId = adminSession.adminId;
-        console.log("Request from admin:", currentUserId);
+      // Supabase anon key가 아닌 경우에만 admin session 확인
+      if (!token.startsWith("eyJ")) {
+        try {
+          const adminSession = await kvGet(`admin_session:${token}`);
+          if (adminSession) {
+            isAdmin = true;
+            currentUserId = adminSession.adminId;
+            console.log("Request from admin:", currentUserId);
+          }
+        } catch (error) {
+          console.log("Admin session check failed:", error);
+        }
       }
     }
 
