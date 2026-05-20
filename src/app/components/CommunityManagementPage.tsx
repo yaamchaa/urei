@@ -13,6 +13,7 @@ import { Label } from "./ui/label";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useComplexList } from "../hooks/useComplexList";
 import { getCategoryName } from "../data/complexes";
+import { adminFetch } from "../adminApi";
 
 // 날짜와 시간 포맷팅 함수 (한국 시간대 KST 기준)
 const formatDateTime = (isoString?: string, fallbackDate?: string, fallbackTime?: string): string => {
@@ -48,6 +49,8 @@ interface Question {
   answers?: any[];
   deleteReason?: string;
   deletedAt?: string;
+  is_private?: boolean;
+  author_id?: string;
 }
 
 interface Message {
@@ -132,19 +135,17 @@ export function CommunityManagementPage() {
   const loadQuestions = async () => {
     setIsLoading(true);
     try {
-      // 카테고리별로 질문 필터링
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions?category=${category}`,
-        {
-          headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
-          },
-        }
+      // 관리자 토큰으로 모든 질문 (비공개 포함) 조회
+      const response = await adminFetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions?category=${category}`
       );
 
       if (response.ok) {
         const data = await response.json();
         setQuestions(data.questions || []);
+        console.log(`✅ 관리자: ${data.questions?.length}개 질문 로드 (비공개 포함)`);
+      } else {
+        console.error("질문 로드 실패:", response.status);
       }
     } catch (error) {
       console.error("질문 로드 오류:", error);
@@ -458,6 +459,11 @@ export function CommunityManagementPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <Badge variant="outline">{getCategoryName(question.category)}</Badge>
+                              {question.is_private && (
+                                <Badge variant="secondary" className="bg-gray-700 text-white">
+                                  🔒 비공개
+                                </Badge>
+                              )}
                               <span className="text-sm text-gray-500">{formatDateTime(question.created_at, question.date)}</span>
                             </div>
                             <CardTitle className="text-lg break-all line-clamp-2">
