@@ -518,7 +518,7 @@ export function Root() {
               <p className="text-sm text-gray-600">
                 성남시 재개발, 재건축 정보 소통 플랫폼
                 <br />
-                성남 개발 소식 "손안에서"
+                성남 개발 소식 "손 안에서"
               </p>
             </div>
             <div>
@@ -526,7 +526,7 @@ export function Root() {
               <address className="text-sm text-gray-600 not-italic">
                 분당구 재건축지원센터 031-729-7225~8
                 <br />
-                원도심 재개발·재건축지원센터 031-729-1746~7
+                원도심 재개발·재건축지원센터 031-729-1745~7
               </address>
             </div>
             <div>
