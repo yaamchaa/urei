@@ -235,6 +235,9 @@ export function HomePage() {
               <p className="text-sm text-gray-600">
                 💬 성남시 정비사업 궁금한 점을 물어보세요.
               </p>
+              <p className="text-sm text-gray-600">
+                💬 성남시 개발 톡톡 AI상담은 재건축·재개발·가로주택정비 등 도시정비 관련 내용만 답변할 수 있으며, 정확하지 않을 수 있으니 담당 부서에 문의 하시기 바랍니다.
+              </p>
             </CardHeader>
             <CardContent>
               {chatMessages.length > 0 && (
