@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useUser } from "../contexts/UserContext";
+import { adminFetch } from "../adminApi";
 
 // GuidelinePage에서 가져온 기본 데이터
 const DEFAULT_PROJECT_TYPES = [
@@ -899,14 +900,10 @@ export function GuideManagementPage() {
   const saveGuideData = async (section: string, data: any) => {
     setSaving(true);
     try {
-      const response = await fetch(
+      const response = await adminFetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/guide-content`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ section, data }),
         }
       );
@@ -914,14 +911,10 @@ export function GuideManagementPage() {
       if (response.ok) {
         // 관리자 활동 로그 기록
         if (user?.complexId === "admin" && user?.memberId) {
-          await fetch(
+          await adminFetch(
             `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/admin/logs`,
             {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${publicAnonKey}`,
-              },
               body: JSON.stringify({
                 adminId: user.memberId,
                 adminName: user.name,
