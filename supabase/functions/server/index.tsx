@@ -356,8 +356,10 @@ async function verifyCsrfToken(c: any, adminSession: any): Promise<boolean> {
 // 관리자 인증 확인 (세션 타임아웃 포함)
 async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
   const token = getBearerToken(c);
+  console.log("🔐 requireAdminAuth - Token:", token ? `${token.substring(0, 8)}...` : "없음");
 
   if (!token) {
+    console.log("❌ 토큰이 없음");
     return {
       ok: false,
       response: c.json({ error: "Unauthorized" }, 401),
@@ -365,9 +367,12 @@ async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
   }
 
   // 관리자 세션 조회
-  const adminSession = await kvGet(`admin_session:${token}`);
+  const sessionKey = `admin_session:${token}`;
+  console.log("🔍 세션 조회:", sessionKey.substring(0, 30) + "...");
+  const adminSession = await kvGet(sessionKey);
 
   if (!adminSession || !adminSession.adminId) {
+    console.log("❌ 세션을 찾을 수 없음 또는 adminId 없음:", adminSession ? "세션 존재하지만 adminId 없음" : "세션 없음");
     return {
       ok: false,
       response: c.json(
@@ -377,10 +382,14 @@ async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
     };
   }
 
+  console.log("✅ 세션 찾음, adminId:", adminSession.adminId);
+
   // 🔒 CSRF 토큰 검증 (state-changing 요청에만 필요)
   if (requireCsrf) {
+    console.log("🔐 CSRF 검증 필요");
     const isValidCsrf = await verifyCsrfToken(c, adminSession);
     if (!isValidCsrf) {
+      console.log("❌ CSRF 토큰 검증 실패");
       return {
         ok: false,
         response: c.json(
@@ -389,6 +398,7 @@ async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
         ),
       };
     }
+    console.log("✅ CSRF 토큰 검증 성공");
   }
 
   // 🔒 세션 타임아웃 검증 (30분, 활동 기반)
@@ -396,8 +406,12 @@ async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
   const lastActivityTime = adminSession.lastActivityAt || adminSession.createdAt;
   const lastActivityAt = new Date(lastActivityTime).getTime();
   const now = Date.now();
+  const elapsedMinutes = Math.floor((now - lastActivityAt) / 60000);
+
+  console.log(`⏰ 세션 활동 시간: ${elapsedMinutes}분 경과 (타임아웃: 30분)`);
 
   if (now - lastActivityAt > SESSION_TIMEOUT) {
+    console.log("❌ 세션 타임아웃");
     // 세션 만료 시 삭제
     await kvDel(`admin_session:${token}`);
     return {
@@ -4314,13 +4328,22 @@ app.get("/make-server-66444bd0/guide-content", async (c) => {
 
 // PUT /guide-content - 가이드 콘텐츠 업데이트
 app.put("/make-server-66444bd0/guide-content", async (c) => {
+  console.log("========================================");
   console.log("PUT /guide-content called");
+  console.log("Headers:", {
+    authorization: c.req.header("Authorization") ? "존재" : "없음",
+    csrf: c.req.header("X-CSRF-Token") ? "존재" : "없음",
+  });
+  console.log("========================================");
 
   // 🔒 관리자 인증 및 CSRF 토큰 검증
   const authResult = await requireAdminAuth(c, true);
   if (!authResult.ok) {
+    console.log("❌ 인증 실패 - 응답 반환");
     return authResult.response;
   }
+
+  console.log("✅ 인증 성공 - 데이터 처리 진행");
 
   try {
     const body = await c.req.json();
