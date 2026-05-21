@@ -29,6 +29,17 @@ export function GuidelinePage() {
   const [serverStreetHousingSteps, setServerStreetHousingSteps] = useState<any[]>([]);
   const [serverFaqs, setServerFaqs] = useState<any[]>([]);
   const [serverGlossary, setServerGlossary] = useState<any[]>([]);
+  const [totalDurations, setTotalDurations] = useState<{
+    bundang: string;
+    'oldtown-redevelopment': string;
+    'oldtown-reconstruction': string;
+    garohousing: string;
+  }>({
+    bundang: '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.',
+    'oldtown-redevelopment': '순조로운 경우 7-9년, 평균적으로 9-12년, 정체·분쟁·금융 문제 시 12년 이상이 소요될 수 있습니다.',
+    'oldtown-reconstruction': '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.',
+    garohousing: '일반 가로주택정비사업은 평균 3-5년이 소요되는 것이 많고, 공공참여형·LH 협력형도 4-6년 내외로 보는 경우가 일반적입니다.'
+  });
 
   // 아이콘 매핑 헬퍼
   const iconMap: Record<string, any> = {
@@ -72,6 +83,9 @@ export function GuidelinePage() {
           }
           if (data.glossary && data.glossary.length > 0) {
             setServerGlossary(data.glossary);
+          }
+          if (data.totalDurations) {
+            setTotalDurations(data.totalDurations);
           }
         }
       } catch (error) {
@@ -1035,7 +1049,7 @@ export function GuidelinePage() {
                         <Home className="w-8 h-8" />
                         <div>
                           <h3 className="text-lg font-bold">분당재건축</h3>
-                          <p className="text-sm opacity-90">8단계</p>
+                          <p className="text-sm opacity-90">추진 단계</p>
                         </div>
                       </div>
                     </div>
@@ -1058,7 +1072,7 @@ export function GuidelinePage() {
                         <Building className="w-8 h-8" />
                         <div>
                           <h3 className="text-lg font-bold">원도심재개발</h3>
-                          <p className="text-sm opacity-90">8단계</p>
+                          <p className="text-sm opacity-90">추진 단계</p>
                         </div>
                       </div>
                     </div>
@@ -1081,7 +1095,7 @@ export function GuidelinePage() {
                         <Home className="w-8 h-8" />
                         <div>
                           <h3 className="text-lg font-bold">원도심 재건축</h3>
-                          <p className="text-sm opacity-90">8단계</p>
+                          <p className="text-sm opacity-90">추진 단계</p>
                         </div>
                       </div>
                     </div>
@@ -1104,7 +1118,7 @@ export function GuidelinePage() {
                         <Wrench className="w-8 h-8" />
                         <div>
                           <h3 className="text-lg font-bold">가로주택정비</h3>
-                          <p className="text-sm opacity-90">8단계</p>
+                          <p className="text-sm opacity-90">추진 단계</p>
                         </div>
                       </div>
                     </div>
@@ -1123,7 +1137,7 @@ export function GuidelinePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-blue-600" />
-                  {selectedProjectType} 추진 8단계
+                  {selectedProjectType} 추진 단계
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1195,10 +1209,10 @@ export function GuidelinePage() {
                 <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-800">
                     ℹ️ <strong>총 소요 기간:</strong>{' '}
-                    {selectedProjectType === '분당재건축' && '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.'}
-                    {selectedProjectType === '원도심재개발' && '순조로운 경우 7-9년, 평균적으로 9-12년, 정체·분쟁·금융 문제 시 12년 이상이 소요될 수 있습니다.'}
-                    {selectedProjectType === '원도심 재건축' && '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.'}
-                    {selectedProjectType === '가로주택정비' && '일반 가로주택정비사업은 평균 3-5년이 소요되는 것이 많고, 공공참여형·LH 협력형도 4-6년 내외로 보는 경우가 일반적입니다.'}
+                    {selectedProjectType === '분당재건축' && totalDurations.bundang}
+                    {selectedProjectType === '원도심재개발' && totalDurations['oldtown-redevelopment']}
+                    {selectedProjectType === '원도심 재건축' && totalDurations['oldtown-reconstruction']}
+                    {selectedProjectType === '가로주택정비' && totalDurations.garohousing}
                   </p>
                 </div>
               </CardContent>
