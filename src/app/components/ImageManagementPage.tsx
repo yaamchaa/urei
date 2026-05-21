@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Building2, Layers, MapPin, Upload, Trash2, AlertCircle, Image as ImageIcon, FileText } from "lucide-react";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useUser } from "../contexts/UserContext";
-import { getCsrfToken } from "../utils/csrf";
+import { adminFetch } from "../adminApi";
 
 interface ImageData {
   aerial?: string;      // 조감도
@@ -26,7 +26,7 @@ export function ImageManagementPage() {
       'bundang': '분당 재건축',
       'oldtown-redevelopment': '원도심 재개발',
       'oldtown-reconstruction': '원도심 재건축',
-      'garohousing': '가로주택정비사업',
+      'garohousing': '가로주택정비사업'
     };
     return categoryNames[cat] || cat;
   };
@@ -102,22 +102,16 @@ export function ImageManagementPage() {
 
       try {
         // 서버에 업로드
-        const csrfToken = getCsrfToken();
-        const response = await fetch(
+        const response = await adminFetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/images/upload`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${publicAnonKey}`,
-              'X-CSRF-Token': csrfToken || '',
-            },
             body: JSON.stringify({
               complex_id: selectedComplexId,
               image_type: type,
               image_data: result,
               file_type: file.type,
-              adminId: user?.id, // 🔒 관리자 ID 전달 (로그 기록용)
+              adminId: user?.memberId, // 🔒 관리자 ID 전달 (로그 기록용)
             }),
           }
         );
