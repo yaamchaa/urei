@@ -6,7 +6,7 @@ import { Textarea } from "./ui/textarea";
 import { Bell, Plus, Trash2, Save, Calendar } from "lucide-react";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { useUser } from "../contexts/UserContext";
-import { getCsrfToken } from "../utils/csrf";
+import { adminFetch } from "../adminApi";
 
 interface YearData {
   year: string;
@@ -81,16 +81,10 @@ export function BannerManagementPage() {
     setSaveMessage("");
 
     try {
-      const csrfToken = getCsrfToken();
-      const response = await fetch(
+      const response = await adminFetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/banner-content`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${publicAnonKey}`,
-            "X-CSRF-Token": csrfToken || "",
-          },
           body: JSON.stringify({
             content: bannerContent,
             adminName: user.name,
