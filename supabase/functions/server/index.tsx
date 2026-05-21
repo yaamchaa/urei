@@ -391,14 +391,13 @@ async function requireAdminAuth(c: any, requireCsrf: boolean = false) {
     }
   }
 
-  // 🔒 세션 타임아웃 검증 (30분)
+  // 🔒 세션 타임아웃 검증 (30분, 활동 기반)
   const SESSION_TIMEOUT = 30 * 60 * 1000; // 30분
-  const sessionCreatedAt = new Date(
-    adminSession.createdAt,
-  ).getTime();
+  const lastActivityTime = adminSession.lastActivityAt || adminSession.createdAt;
+  const lastActivityAt = new Date(lastActivityTime).getTime();
   const now = Date.now();
 
-  if (now - sessionCreatedAt > SESSION_TIMEOUT) {
+  if (now - lastActivityAt > SESSION_TIMEOUT) {
     // 세션 만료 시 삭제
     await kvDel(`admin_session:${token}`);
     return {
@@ -3517,6 +3516,7 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
     const csrfToken = generateCsrfToken();
 
     // 관리자 세션 저장
+    const sessionTimestamp = new Date().toISOString();
     await kvSet(`admin_session:${adminApiToken}`, {
       adminId: adminId,
       name: normalizedAdminData.name,
@@ -3525,7 +3525,8 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
       isPrimaryAdmin: normalizedAdminData.isPrimaryAdmin,
       isActive: normalizedAdminData.isActive,
       csrfToken: csrfToken, // 🔒 CSRF 토큰 추가
-      createdAt: new Date().toISOString(),
+      createdAt: sessionTimestamp,
+      lastActivityAt: sessionTimestamp, // 초기 활동 시간도 설정
     });
 
     // 비밀번호 제외하고 반환
@@ -4314,6 +4315,12 @@ app.get("/make-server-66444bd0/guide-content", async (c) => {
 // PUT /guide-content - 가이드 콘텐츠 업데이트
 app.put("/make-server-66444bd0/guide-content", async (c) => {
   console.log("PUT /guide-content called");
+
+  // 🔒 관리자 인증 및 CSRF 토큰 검증
+  const authResult = await requireAdminAuth(c, true);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
 
   try {
     const body = await c.req.json();
