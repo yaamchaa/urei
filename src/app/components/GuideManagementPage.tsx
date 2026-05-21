@@ -835,6 +835,19 @@ export function GuideManagementPage() {
   // 용어사전 상태
   const [glossary, setGlossary] = useState<any[]>([]);
 
+  // 총 소요 기간 상태 (카테고리별)
+  const [totalDurations, setTotalDurations] = useState<{
+    bundang: string;
+    'oldtown-redevelopment': string;
+    'oldtown-reconstruction': string;
+    garohousing: string;
+  }>({
+    bundang: '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.',
+    'oldtown-redevelopment': '순조로운 경우 7-9년, 평균적으로 9-12년, 정체·분쟁·금융 문제 시 12년 이상이 소요될 수 있습니다.',
+    'oldtown-reconstruction': '순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다.',
+    garohousing: '일반 가로주택정비사업은 평균 3-5년이 소요되는 것이 많고, 공공참여형·LH 협력형도 4-6년 내외로 보는 경우가 일반적입니다.'
+  });
+
   useEffect(() => {
     loadGuideData();
   }, []);
@@ -862,6 +875,11 @@ export function GuideManagementPage() {
         setStreetHousingSteps(data.streetHousingSteps && data.streetHousingSteps.length > 0 ? data.streetHousingSteps : DEFAULT_STREET_HOUSING_STEPS);
         setFaqs(data.faqs && data.faqs.length > 0 ? data.faqs : DEFAULT_FAQS);
         setGlossary(data.glossary && data.glossary.length > 0 ? data.glossary : DEFAULT_GLOSSARY);
+
+        // 총 소요 기간 로드
+        if (data.totalDurations) {
+          setTotalDurations(data.totalDurations);
+        }
       }
     } catch (error) {
       console.error("가이드 데이터 로드 실패:", error);
@@ -952,10 +970,11 @@ export function GuideManagementPage() {
       </div>
 
       <Tabs defaultValue="lead-zone" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          
+        <TabsList className="grid w-full grid-cols-6">
+
           <TabsTrigger value="project-types">사업유형</TabsTrigger>
           <TabsTrigger value="steps">진행단계</TabsTrigger>
+          <TabsTrigger value="duration">총 소요 기간</TabsTrigger>
           <TabsTrigger value="faq">FAQ</TabsTrigger>
           <TabsTrigger value="glossary">용어사전</TabsTrigger>
         </TabsList>
@@ -2038,6 +2057,86 @@ export function GuideManagementPage() {
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 총 소요 기간 관리 */}
+        <TabsContent value="duration" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>총 소요 기간 관리</CardTitle>
+              <p className="text-sm text-gray-600 mt-2">
+                각 사업 유형별 총 소요 기간을 설정합니다. 가이드 페이지의 "진행단계" 탭 하단에 표시됩니다.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* 분당 재건축 */}
+              <div className="space-y-3">
+                <Label htmlFor="duration-bundang" className="text-base font-semibold">
+                  분당 재건축
+                </Label>
+                <Textarea
+                  id="duration-bundang"
+                  value={totalDurations.bundang}
+                  onChange={(e) => setTotalDurations({ ...totalDurations, bundang: e.target.value })}
+                  rows={3}
+                  placeholder="예: 순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다."
+                />
+              </div>
+
+              {/* 원도심 재개발 */}
+              <div className="space-y-3">
+                <Label htmlFor="duration-oldtown-redevelopment" className="text-base font-semibold">
+                  원도심 재개발
+                </Label>
+                <Textarea
+                  id="duration-oldtown-redevelopment"
+                  value={totalDurations['oldtown-redevelopment']}
+                  onChange={(e) => setTotalDurations({ ...totalDurations, 'oldtown-redevelopment': e.target.value })}
+                  rows={3}
+                  placeholder="예: 순조로운 경우 7-9년, 평균적으로 9-12년, 정체·분쟁·금융 문제 시 12년 이상이 소요될 수 있습니다."
+                />
+              </div>
+
+              {/* 원도심 재건축 */}
+              <div className="space-y-3">
+                <Label htmlFor="duration-oldtown-reconstruction" className="text-base font-semibold">
+                  원도심 재건축
+                </Label>
+                <Textarea
+                  id="duration-oldtown-reconstruction"
+                  value={totalDurations['oldtown-reconstruction']}
+                  onChange={(e) => setTotalDurations({ ...totalDurations, 'oldtown-reconstruction': e.target.value })}
+                  rows={3}
+                  placeholder="예: 순조로운 경우 5-7년, 평균적으로 7-10년, 지연 시 10년 이상 소요될 수 있습니다."
+                />
+              </div>
+
+              {/* 가로주택정비 */}
+              <div className="space-y-3">
+                <Label htmlFor="duration-garohousing" className="text-base font-semibold">
+                  가로주택정비사업
+                </Label>
+                <Textarea
+                  id="duration-garohousing"
+                  value={totalDurations.garohousing}
+                  onChange={(e) => setTotalDurations({ ...totalDurations, garohousing: e.target.value })}
+                  rows={3}
+                  placeholder="예: 일반 가로주택정비사업은 평균 3-5년이 소요되는 것이 많고, 공공참여형·LH 협력형도 4-6년 내외로 보는 경우가 일반적입니다."
+                />
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button
+                  onClick={() => saveGuideData("totalDurations", totalDurations)}
+                  disabled={saving}
+                  size="lg"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saving ? "저장 중..." : "총 소요 기간 저장"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
