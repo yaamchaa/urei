@@ -26,7 +26,7 @@ export function ImageManagementPage() {
       'bundang': '분당 재건축',
       'oldtown-redevelopment': '원도심 재개발',
       'oldtown-reconstruction': '원도심 재건축',
-      'garohousing': '가로주택정비사업'
+      'garohousing': '가로주택정비사업',
     };
     return categoryNames[cat] || cat;
   };
