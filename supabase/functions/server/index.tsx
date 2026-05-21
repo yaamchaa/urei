@@ -4289,6 +4289,8 @@ app.get("/make-server-66444bd0/guide-content", async (c) => {
       (await kvGet("guide_street_housing_steps")) || [];
     const leadZoneData =
       (await kvGet("guide_lead_zone")) || null;
+    const totalDurationsData =
+      (await kvGet("guide_total_durations")) || null;
 
     console.log("✅ 가이드 콘텐츠 조회 완료");
     return c.json({
@@ -4301,6 +4303,7 @@ app.get("/make-server-66444bd0/guide-content", async (c) => {
       redevelopmentSteps: redevelopmentStepsData,
       streetHousingSteps: streetHousingStepsData,
       leadZone: leadZoneData,
+      totalDurations: totalDurationsData,
     });
   } catch (error: any) {
     console.error("Guide content fetch error:", error);
@@ -4348,6 +4351,9 @@ app.put("/make-server-66444bd0/guide-content", async (c) => {
         break;
       case "leadZone":
         key = "guide_lead_zone";
+        break;
+      case "totalDurations":
+        key = "guide_total_durations";
         break;
       default:
         return c.json({ error: "Invalid section" }, 400);
