@@ -54,7 +54,7 @@ export function AnyIdProvider({ children }: AnyIdProviderProps) {
   const [session, setSession] = useState<AnyIdSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-f75f5f59`;
+  const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0`;
 
   // Any-ID 활성화 상태 확인
   const checkStatus = async () => {
