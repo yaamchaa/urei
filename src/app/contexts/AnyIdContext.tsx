@@ -217,7 +217,7 @@ export async function handleAnyIdCallback() {
   }
 
   try {
-    const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-f75f5f59`;
+    const baseUrl = `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0`;
 
     const response = await fetch(
       `${baseUrl}/anyid/auth/callback?code=${code}&state=${state}`,
