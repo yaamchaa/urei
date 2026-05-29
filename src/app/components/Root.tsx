@@ -530,7 +530,7 @@ export function Root() {
               </address>
             </div>
             <div>
-              <h2 className="font-bold text-gray-900 mb-3">고지사항</h2>
+              <h2 className="font-bold text-gray-900 mb-3">공지사항</h2>
               <p className="text-sm text-gray-600">
                 ⚠️ 본 사이트의 모든 데이터 입력은 Any id로 운영됩니다.
                 <br />
