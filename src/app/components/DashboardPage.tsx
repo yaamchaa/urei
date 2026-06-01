@@ -937,16 +937,20 @@ export function DashboardPage() {
       <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              {complex.name} 진행율 현황 및 일정
-            </DialogTitle>
-            <DialogDescription>
-              실시간 재건축 진행 상황과 향후 예정 일정
-            </DialogDescription>
-          </DialogHeader>
+            <DialogTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+              <div className="flex items-center gap-2">
+               <Calendar className="w-5 h-5 text-blue-600 shrink-0" />
+                <span>{complex.name}</span>
+             </div>
+                <span className="w-full self-start pl-7 text-left sm:w-auto sm:pl-0">진행율 현황 및 일정</span>
+             </DialogTitle>
+          <DialogDescription>
+            실시간 재건축 진행 상황과 향후 예정 일정
+      </DialogDescription>
+    </DialogHeader>
           {displayedDetailedProgress && (
             <div className="space-y-4">
+              
               {/* 현재 진행 상황 */}
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
