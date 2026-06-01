@@ -287,44 +287,46 @@ export function HomePage() {
               )}
 
               <form
-                className="flex gap-2 items-end"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSearch(currentInput);
-                }}
-                role="search"
-                aria-label="챗봇 질문하기"
-              >
-                <label htmlFor="chat-input" className="sr-only">
-                  재건축 관련 질문 입력
-                </label>
-                <Textarea
-                  ref={textareaRef}
-                  id="chat-input"
-                  placeholder="예: 시범단지 ..."
-                  value={currentInput}
-                  onChange={handleInputChange}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSearch(currentInput);
-                    }
-                  }}
-                  className="flex-1 min-h-[42px] max-h-[150px] resize-none overflow-y-auto"
-                  disabled={isLoading}
-                  aria-describedby="suggested-questions-label"
-                  rows={1}
-                />
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  aria-label={isLoading ? "질문 처리 중" : "질문 전송"}
-                  className="shrink-0"
-                >
-                  <Search className="w-4 h-4 mr-2" aria-hidden="true" />
-                  {isLoading ? "처리중..." : "검색"}
-                </Button>
-              </form>
+  className="flex flex-col md:flex-row gap-2 items-stretch md:items-end"
+  onSubmit={(e) => {
+    e.preventDefault();
+    handleSearch(currentInput);
+  }}
+  role="search"
+  aria-label="챗봇 질문하기"
+>
+  <label htmlFor="chat-input" className="sr-only">
+    재건축 관련 질문 입력
+  </label>
+
+  <Textarea
+    ref={textareaRef}
+    id="chat-input"
+    placeholder="예: 시범단지 ..."
+    value={currentInput}
+    onChange={handleInputChange}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSearch(currentInput);
+      }
+    }}
+    className="w-full md:flex-1 min-h-[42px] max-h-[150px] resize-none overflow-y-auto"
+    disabled={isLoading}
+    aria-describedby="suggested-questions-label"
+    rows={1}
+  />
+
+  <Button
+    type="submit"
+    disabled={isLoading}
+    aria-label={isLoading ? "질문 처리 중" : "질문 전송"}
+    className="w-full md:w-auto shrink-0"
+  >
+    <Search className="w-4 h-4 mr-2" aria-hidden="true" />
+    {isLoading ? "처리중..." : "검색"}
+  </Button>
+</form>
             </CardContent>
           </Card>
         </div>
@@ -335,7 +337,7 @@ export function HomePage() {
           <CardContent className="py-12 text-center">
             <h2 id="cta-title" className="text-2xl font-bold mb-4">더 많은 정보가 필요하신가요?</h2>
             <p className="mb-6 text-blue-100">
-              시민광장에서 다른 주민들과 소통하고, 전문가에게 질문하세요.
+              시민광장에서 지역별 지원 센터에 질문하세요.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
               <Link to="/community" aria-label="시민광장으로 이동" className="no-underline">
@@ -350,12 +352,18 @@ export function HomePage() {
                   정비사업 가이드
                 </Button>
               </Link>
-              <Link to="/news" aria-label="시정소식 뉴스 페이지로 이동" className="no-underline">
-                <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
-                  <Newspaper className="w-5 h-5 mr-2" aria-hidden="true" />
-                  시정소식 뉴스
+              <a
+               href="https://seongnam.go.kr/city/1000052/30001/bbsList.do"
+               target="_blank"
+               rel="noopener noreferrer"
+               aria-label="시정소식 뉴스 외부 페이지 새 창 이동"
+               className="no-underline"
+              >
+               <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
+                <Newspaper className="w-5 h-5 mr-2" aria-hidden="true" />
+                 시정소식 뉴스(새창)
                 </Button>
-              </Link>
+              </a>
 
               <a
                 href="https://seongnam.go.kr/urbanRenewal/urbanRenewalDistrictArea.do?menuIdx=1001109&returnURL=%2Fmain.do"
