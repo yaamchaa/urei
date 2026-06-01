@@ -218,7 +218,7 @@ export function TransportManagementPage() {
                   id="improvement-note"
                   value={improvementNote}
                   onChange={(e) => setImprovementNote(e.target.value)}
-                  placeholder="예: 재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다."
+                  placeholder="예: 정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다."
                   rows={3}
                   className="mt-2 resize-none"
                 />
