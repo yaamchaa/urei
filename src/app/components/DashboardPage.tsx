@@ -757,8 +757,8 @@ export function DashboardPage() {
               ) : (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
                   <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600 mb-2">등록된 이미지가 없습니다</p>
-                  <p className="text-xs text-gray-500">관리자 페이지에서 업로드하세요</p>
+                  <p className="text-sm text-gray-600 mb-2">조감도는 준비 중 입니다.</p>
+                  <p className="text-xs text-gray-500">조감도가 완료 되면 업로드 됩니다.</p>
                 </div>
               )}
             </CardContent>
@@ -798,8 +798,8 @@ export function DashboardPage() {
               ) : (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
                   <Layers className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600 mb-2">등록된 이미지가 없습니다</p>
-                  <p className="text-xs text-gray-500">관리자 페이지에서 업로드하세요</p>
+                  <p className="text-sm text-gray-600 mb-2">배치도가 준비 중입니다.</p>
+                  <p className="text-xs text-gray-500">배치도가 완료 되면 업로드 됩니다.</p>
                 </div>
               )}
             </CardContent>
@@ -839,8 +839,8 @@ export function DashboardPage() {
               ) : (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
                   <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600 mb-2">등록된 이미지가 없습니다</p>
-                  <p className="text-xs text-gray-500">관리자 페이지에서 업로드하세요</p>
+                  <p className="text-sm text-gray-600 mb-2">구역계가 준비 중입니다.</p>
+                  <p className="text-xs text-gray-500">구역계가 완료 되면 업로드 됩니다.</p>
                 </div>
               )}
             </CardContent>
