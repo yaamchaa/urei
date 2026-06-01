@@ -697,7 +697,7 @@ export function CommunityPage() {
            <span className="w-3 h-3 bg-red-600 rounded-full"></span> 
             {categoryName} 톡톡
           </h1>
-          <p className="text-gray-600">주민들과 정보를 공유하고 함께 의견을 나누세요.</p>
+          <p className="text-gray-600">문의 하시면 지원 센터에서 답변을 드립니다.</p>
         </div>
 
         {/* Info Banner */}      
@@ -751,7 +751,7 @@ export function CommunityPage() {
                     </div>
                   </div>
                   <Input
-                    placeholder="예: 재건축 관련 문의입니다"
+                    placeholder="예: 도시정비 관련 문의입니다"
                     value={newQuestion.title}
                     onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
                     maxLength={50}
@@ -771,7 +771,7 @@ export function CommunityPage() {
                 </div>
                 <Button onClick={handleSubmitQuestion} className="w-full">
                   <Send className="w-4 h-4 mr-2" />
-                  질문 등록
+                  등록하기
                 </Button>
                </CardContent>              
             </Card>
@@ -779,8 +779,8 @@ export function CommunityPage() {
             {/* Questions List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-900">최근 질문</h3>
-                <Badge variant="secondary">{questions.length}개 질문</Badge>
+                <h3 className="text-lg font-bold text-gray-900">최근 문의</h3>
+                <Badge variant="secondary">{questions.length}개 문의</Badge>
               </div>
 
               {questions.slice(0, visibleQuestionsCount).map((q) => {
