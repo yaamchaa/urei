@@ -331,7 +331,7 @@ export function NewsfeedPage() {
            </div>
             
             <p className="mt-3 text-xs text-yellow-50">
-              성남소식 문자서비스, ‘비전성남’, 성남시청 카톡 채널’ 연결
+              '문자서비스', ‘비전성남’, 성남시청 카톡 채널’ 연결
             </p>
           </CardContent>
         </Card>
