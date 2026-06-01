@@ -318,18 +318,18 @@ export function DashboardPage() {
             // transport_info가 객체인 경우와 문자열인 경우 처리
             if (typeof transportData.transport_info === 'object') {
               setTransportInfo(transportData.transport_info.info || complex.transportInfo);
-              setTransportImprovementNote(transportData.transport_info.improvementNote || "재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
+              setTransportImprovementNote(transportData.transport_info.improvementNote || "정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
             } else {
               setTransportInfo(transportData.transport_info);
-              setTransportImprovementNote("재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
+              setTransportImprovementNote("정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
             }
           } else {
             setTransportInfo(complex.transportInfo);
-            setTransportImprovementNote("재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
+            setTransportImprovementNote("정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
           }
         } else {
           setTransportInfo(complex.transportInfo);
-          setTransportImprovementNote("재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
+          setTransportImprovementNote("정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
         }
 
         // 비고 정보 로드
@@ -478,7 +478,7 @@ export function DashboardPage() {
         setTransportInfo(complex.transportInfo);
         setNotes(complex.notes);
         setStudentProjection(complex.studentProjection || "");
-        setTransportImprovementNote("재건축 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
+        setTransportImprovementNote("정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
         setFloorAreaRatio(complex.floorAreaRatio);
         setBuildingCoverageRatio(complex.buildingCoverageRatio || "-");
         setParkingBefore(complex.parkingBefore);
@@ -651,7 +651,7 @@ export function DashboardPage() {
                 />
               </div>
               <p className="text-xs text-gray-500 mt-2">{complex.status}</p>
-              {complex.detailedProgress && (
+              {displayedDetailedProgress && (
                 <p className="text-sm text-blue-600 mt-2 font-bold">(진행률 상세 정보 보기)</p>
               )}
             </CardContent>
@@ -1106,7 +1106,7 @@ export function DashboardPage() {
               분담금 안내
             </DialogTitle>
             <DialogDescription>
-              재건축 분담금의 개념과 계산 방식을 알아보세요
+              재건축·재개발 분담금, 개념과 계산방식을 알아보세요
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 overflow-y-auto scrollbar-hide pr-2">
