@@ -850,7 +850,7 @@ export function DashboardPage() {
         {/* Timeline */}
         <Card>
           <CardHeader>
-            <CardTitle className="font-bold">{complex.name} 추진 일정</CardTitle>
+            <CardTitle className="font-bold">{complex.name} 추진일정</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
