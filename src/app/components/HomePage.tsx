@@ -153,7 +153,7 @@ export function HomePage() {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-12" aria-labelledby="service-categories-title">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
-          <h2 id="service-categories-title" className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2 m-[0px]">
+          <h2 id="service-categories-title" className="text-xl md:text-2xl font-bold text-gray-700 flex items-center gap-2 m-[0px]">
             <span className="w-3 h-3 bg-purple-600 rounded-full" aria-hidden="true"></span>
             정비 사업 현황
           </h2>
@@ -202,7 +202,7 @@ export function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
           <h2
             id="chatbot-title"
-            className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2 ml-[30px] mr-[0px] my-[0px]"
+            className="text-xl md:text-2xl font-bold text-gray-700 flex items-center gap-2 ml-[30px] mr-[0px] my-[0px]"
           >
             <span className="w-3 h-3 bg-purple-600 rounded-full" aria-hidden="true"></span>
             AI 챗봇 톡톡
