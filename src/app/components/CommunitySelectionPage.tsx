@@ -100,7 +100,7 @@ export function CommunitySelectionPage() {
             시민광장 톡톡
           </h1>
           <p className="text-lg text-gray-600">
-            원하는 지역별 사업 유형을 선택하여 문의하세요
+            원하는 지역별 사업 유형을 선택하여 센터톡톡에 문의하세요
           </p>
         </div>
 
