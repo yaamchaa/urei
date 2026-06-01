@@ -224,7 +224,7 @@ export function Root() {
                 />
               </div>
               <div>
-                <span className="font-bold text-gray-900 text-[20px]">성남시 개발톡톡(talktalk)</span>
+                <span className="font-bold text-gray-600 text-[20px]">성남시 개발톡톡(talktalk)</span>
               </div>
             </Link>
 
