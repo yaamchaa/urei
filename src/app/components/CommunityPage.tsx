@@ -751,7 +751,7 @@ export function CommunityPage() {
                     </div>
                   </div>
                   <Input
-                    placeholder="예: 재건축 관련 질문입니다"
+                    placeholder="예: 재건축 관련 문의입니다"
                     value={newQuestion.title}
                     onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
                     maxLength={50}
@@ -991,15 +991,7 @@ export function CommunityPage() {
                 {/* 주요 특징·장점 */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h3 className="text-base font-semibold text-gray-900 mb-2">⚠️ 주요 특징·장점</h3>
-                  <ul className="space-y-1 text-sm text-gray-700">
-                    <li className="flex items-start gap-2">
-                      <span>•</span>
-                      <span>2022년 9월 도입 이후 현재까지 약 5만 6천 건 이상 접수,</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span>•</span>
-                      <span>처리 완료 건수가 약 5만 6천 건, 응답률 98% 이상</span>
-                    </li>
+                  <ul className="space-y-1 text-sm text-gray-700">                    
                     <li className="flex items-start gap-2">
                       <span>•</span>
                       <span>앱 설치, 회원가입, 로그인 없이 휴대폰 문자 하나로 가능</span>
@@ -1470,7 +1462,7 @@ export function CommunityPage() {
               <li className="pl-4 -indent-4">• 허위 정보 유포 및 타인 비방은 금지됩니다.</li>
               <li className="pl-4 -indent-4">• 개인정보 보호를 위해 구체적인 개인정보는 작성하지 마세요.</li>
               <li className="pl-4 -indent-4">• 정확한 정보는 반드시 공식 채널을 통해 확인하세요.</li>
-              <li className="pl-4 -indent-4">• 분당 재건축 지원센터 및 원도심 재개발·재건축 지원센터가 실시간 모니터링합니다.</li>
+              <li className="pl-4 -indent-4">• 분당 재건축 지원센터 및 원도심 재개발·재건축 지원센터가 모니터링합니다.</li>
             </ul>
           </CardContent>
         </Card>
