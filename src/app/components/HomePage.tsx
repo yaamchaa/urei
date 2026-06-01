@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, MessageSquare, Building2, MapPin, Home, Newspaper, Users, Shield, CheckCircle } from "lucide-react";
+import { Search, MessageSquare, Building2, MapPin, Home, Newspaper, Users } from "lucide-react";
 import { Link } from "react-router";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -9,8 +9,6 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info";
 import { TypingMessage } from "./TypingMessage";
-import { useAnyId } from "../contexts/AnyIdContext";
-import { AnyIdAuthDialog } from "./AnyIdAuthDialog";
 
 export function HomePage() {
   useEffect(() => {
@@ -27,18 +25,6 @@ export function HomePage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const { isAuthenticated: anyIdAuthenticated, user: anyIdUser } = useAnyId();
-  const [anyIdDialogOpen, setAnyIdDialogOpen] = useState(false);
-
-  const suggestedQuestions = [
-    "시범단지 분담금은?",
-    "공공기여는?",
-    "학교 과밀화 대책",
-    "이주비 대출 방법",
-    "재건축 진행 단계",
-    "가로주택정비사업?",
-  ];
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -144,31 +130,14 @@ export function HomePage() {
     } catch (error: any) {
       const errorMessage = {
         role: "assistant" as const,
-        content: "죄송합니다. 응답을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.💡 문제가 계속되면 시민광장에서 질문을 남겨주세요.",
+        content:
+          "죄송합니다. 응답을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.💡 문제가 계속되면 시민광장에서 질문을 남겨주세요.",
       };
 
       setChatMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickQuestion = (question: string) => {
-    setCurrentInput(question);
-    handleSearch(question);
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-
-    setTimeout(() => {
-      if (chatContainerRef.current) {
-        chatContainerRef.current.scrollTo({
-          top: chatContainerRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      }
-    }, 150);
   };
 
   return (
@@ -182,37 +151,52 @@ export function HomePage() {
         <link rel="canonical" href={window.location.origin} />
       </Helmet>
 
-      {/* Any-ID 인증 안내 배너 - 미인증 시만 표시 */}
-      {!anyIdAuthenticated && (
-        <section className="w-full pt-8 pb-4" aria-labelledby="anyid-banner">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <Shield className="w-12 h-12 flex-shrink-0" aria-hidden="true" />
-                  <div>
-                    <h2 id="anyid-banner" className="text-xl font-bold mb-2">
-                      🔐 시민 인증 (Any-ID)
-                    </h2>
-                    <p className="text-sm text-green-50 mb-1">
-                      회원가입 없이 본인 인증만으로 서비스를 이용하세요
-                    </p>
-                    <p className="text-xs text-green-100">
-                      모바일신분증 · 공동인증서 · 금융인증서 · 간편인증 · 민간ID (네이버, 카카오, 토스)
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setAnyIdDialogOpen(true)}
-                  className="bg-white text-green-600 hover:bg-green-50 font-semibold px-8 py-3 text-base whitespace-nowrap"
-                >
-                  지금 인증하기
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-12" aria-labelledby="service-categories-title">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
+          <h2 id="service-categories-title" className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2 m-[0px]">
+            <span className="w-3 h-3 bg-purple-600 rounded-full" aria-hidden="true"></span>
+            정비 사업 현황
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          <Link to="/dashboard/bundang-reconstruction" aria-label="분당 재건축 정보 보기" className="no-underline">
+            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
+              <CardContent className="pt-10 pb-8 text-center">
+                <Building2 className="w-10 h-10 text-red-600 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-base font-bold text-gray-900">분당 재건축</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/dashboard/old-town-reconstruction" aria-label="원도심 재건축 정보 보기" className="no-underline">
+            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
+              <CardContent className="pt-10 pb-8 text-center">
+                <Building2 className="w-10 h-10 text-green-600 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-base font-bold text-gray-900">원도심 재건축</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/dashboard/old-town-redevelopment" aria-label="원도심 재개발 정보 보기" className="no-underline">
+            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
+              <CardContent className="pt-10 pb-8 text-center">
+                <MapPin className="w-10 h-10 text-purple-600 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-base font-bold text-gray-900">원도심 재개발</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/dashboard/street-housing" aria-label="가로주택정비사업 정보 보기" className="no-underline">
+            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
+              <CardContent className="pt-10 pb-8 text-center">
+                <Home className="w-10 h-10 text-blue-600 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-base font-bold text-gray-900 whitespace-nowrap">가로주택정비사업</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      </section>
 
       <section className="w-full pt-12 pb-8" aria-labelledby="chatbot-title">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
@@ -302,27 +286,6 @@ export function HomePage() {
                 </div>
               )}
 
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2" id="suggested-questions-label">
-                  자주 묻는 질문:
-                </p>
-                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="suggested-questions-label">
-                  {suggestedQuestions.map((q, idx) => (
-                    <Button
-                      key={idx}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickQuestion(q)}
-                      className="text-xs"
-                      disabled={isLoading}
-                      aria-label={`자주 묻는 질문: ${q}`}
-                    >
-                      {q}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
               <form
                 className="flex gap-2 items-end"
                 onSubmit={(e) => {
@@ -367,53 +330,6 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full" aria-labelledby="service-categories-title">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
-          <h2 id="service-categories-title" className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2 m-[0px]">
-            <span className="w-3 h-3 bg-purple-600 rounded-full" aria-hidden="true"></span>
-            정비 사업 현황
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-          <Link to="/dashboard/bundang-reconstruction" aria-label="분당 재건축 정보 보기" className="no-underline">
-            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
-              <CardContent className="pt-10 pb-8 text-center">
-                <Building2 className="w-10 h-10 text-red-600 mx-auto mb-3" aria-hidden="true" />
-                <p className="text-base font-bold text-gray-900">분당 재건축</p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/dashboard/old-town-reconstruction" aria-label="원도심 재건축 정보 보기" className="no-underline">
-            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
-              <CardContent className="pt-10 pb-8 text-center">
-                <Building2 className="w-10 h-10 text-green-600 mx-auto mb-3" aria-hidden="true" />
-                <p className="text-base font-bold text-gray-900">원도심 재건축</p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/dashboard/old-town-redevelopment" aria-label="원도심 재개발 정보 보기" className="no-underline">
-            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
-              <CardContent className="pt-10 pb-8 text-center">
-                <MapPin className="w-10 h-10 text-purple-600 mx-auto mb-3" aria-hidden="true" />
-                <p className="text-base font-bold text-gray-900">원도심 재개발</p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/dashboard/street-housing" aria-label="가로주택정비사업 정보 보기" className="no-underline">
-            <Card className="hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer h-full">
-              <CardContent className="pt-10 pb-8 text-center">
-                <Home className="w-10 h-10 text-blue-600 mx-auto mb-3" aria-hidden="true" />
-                <p className="text-base font-bold text-gray-900 whitespace-nowrap">가로주택정비사업</p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </section>
-
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" aria-labelledby="cta-title">
         <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
           <CardContent className="py-12 text-center">
@@ -448,20 +364,14 @@ export function HomePage() {
                 aria-label="정비구역 지번검색 외부 페이지 새 창 이동"
                 className="no-underline"
               >
-               <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">               
-                정비구역 지번검색(새창)
-               </Button>
+                <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
+                  정비구역 지번검색(새창)
+                </Button>
               </a>
             </div>
           </CardContent>
         </Card>
       </section>
-
-      {/* Any-ID 인증 다이얼로그 */}
-      <AnyIdAuthDialog
-        open={anyIdDialogOpen}
-        onOpenChange={setAnyIdDialogOpen}
-      />
     </div>
   );
 }
