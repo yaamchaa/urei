@@ -1110,7 +1110,7 @@ export function DashboardPage() {
               분담금 안내
             </DialogTitle>
             <DialogDescription>
-              재건축·재개발 분담금, 개념과 계산방식을 알아보세요
+              재건축·재개발 분담금 개념과 계산방식을 알아보세요
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 overflow-y-auto scrollbar-hide pr-2">
