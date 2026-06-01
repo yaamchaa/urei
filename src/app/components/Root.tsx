@@ -532,7 +532,7 @@ export function Root() {
             <div>
               <h2 className="font-bold text-gray-900 mb-3">공지사항</h2>
               <p className="text-sm text-gray-600">
-                ⚠️ 시민광장톡톡 문의는 Any id 시민인증 후 가능합니다.
+                ⚠️ 시민광장톡톡 문의는 Any id 인증 후 가능합니다.
                 <br />
                 개인정보는 수집 하지 않습니다.
               </p>
