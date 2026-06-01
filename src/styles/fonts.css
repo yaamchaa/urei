@@ -1,0 +1,37 @@
+/* Noto Sans CJK KR - 한글용 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+/* Univers Condensed - 영문용 */
+/* Univers 47 Light Condensed - 일반 영문 */
+/* Univers 57 Condensed - 볼드 영문 */
+@font-face {
+  font-family: 'Univers';
+  src: local('Univers 47 Light Condensed'), local('Univers LT Std 47 Light Condensed');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Univers';
+  src: local('Univers 57 Condensed'), local('Univers LT Std 57 Condensed');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Univers';
+  src: local('Univers 57 Condensed'), local('Univers LT Std 57 Condensed');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Univers';
+  src: local('Univers 67 Bold Condensed'), local('Univers LT Std 67 Bold Condensed');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
