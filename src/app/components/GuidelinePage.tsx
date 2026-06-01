@@ -948,7 +948,7 @@ export function GuidelinePage() {
             <span className="w-3 h-3 bg-green-600 rounded-full"></span>
             정비사업 가이드
           </h1>
-          <p className="text-gray-600">도시정비에 필요한 정보를 확인하세요.</p>
+          <p className="text-gray-600">도시정비에 필요한 모든 정보를 확인하세요</p>
         </div>
 
         <Tabs defaultValue="types" className="space-y-6">
