@@ -335,9 +335,9 @@ export function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" aria-labelledby="cta-title">
         <Card className="bg-gradient-to-r from-purple-600 to-purple-700 text-white">
           <CardContent className="py-12 text-center">
-            <h2 id="cta-title" className="text-2xl font-bold mb-4">더 많은 정보가 필요하신가요?</h2>
+            <h2 id="cta-title" className="text-xl font-bold mb-4">더 많은 정보가 필요하신가요?</h2>
             <p className="mb-6 text-blue-100">
-              시민광장에서 지역별 지원 센터에 질문하세요.
+              '시민광장 톡톡' 지원센터에 질문하세요.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
               <Link to="/community" aria-label="시민광장으로 이동" className="no-underline">
