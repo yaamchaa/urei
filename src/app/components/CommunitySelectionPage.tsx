@@ -100,7 +100,7 @@ export function CommunitySelectionPage() {
             시민광장 톡톡
           </h1>
           <p className="text-lg text-gray-600">
-            원하는 사업 유형을 선택하여 소통하세요
+            원하는 지역별 사업 유형을 선택하여 문의하세요
           </p>
         </div>
 
@@ -137,7 +137,7 @@ export function CommunitySelectionPage() {
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="py-6">
               <p className="text-sm text-blue-800 text-center">
-                💡 각 사업 유형별로 소식, 투표, 의견을 공유할 수 있습니다.
+                💡 각 사업 유형별로 궁금한 사항을 문의할 수 있습니다.
               </p>
             </CardContent>
           </Card>
