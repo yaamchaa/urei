@@ -347,7 +347,7 @@ export function HomePage() {
                 </Button>
               </Link>
               <Link to="/guide" aria-label="재건축 가이드 페이지로 이동" className="no-underline">
-                <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
+                <Button size="lg" variant="secondary" className="w-full">
                   <Search className="w-5 h-5 mr-2" aria-hidden="true" />
                   정비사업 가이드
                 </Button>
@@ -359,7 +359,7 @@ export function HomePage() {
                aria-label="시정소식 뉴스 외부 페이지 새 창 이동"
                className="no-underline"
               >
-               <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
+               <Button size="lg" variant="secondary" className="w-full">
                 <Newspaper className="w-5 h-5 mr-2" aria-hidden="true" />
                  시정소식 뉴스(새창)
                 </Button>
@@ -372,7 +372,7 @@ export function HomePage() {
                 aria-label="정비구역 지번검색 외부 페이지 새 창 이동"
                 className="no-underline"
               >
-                <Button size="lg" variant="outline" className="w-full bg-white text-blue-600 hover:bg-blue-50">
+                <Button size="lg" variant="secondary" className="w-full">
                   정비구역 지번검색(새창)
                 </Button>
               </a>
