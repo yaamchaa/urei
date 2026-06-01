@@ -944,7 +944,7 @@ export function GuidelinePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-gray-700 mb-2 flex items-center gap-2">
             <span className="w-3 h-3 bg-green-600 rounded-full"></span>
             정비사업 가이드
           </h1>
