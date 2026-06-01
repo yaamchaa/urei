@@ -225,7 +225,7 @@ export function NewsfeedPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-700">
               <TrendingUp className="w-5 h-5" />
-              주요 소식
+              도시정비 주요 소식
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -272,247 +272,27 @@ export function NewsfeedPage() {
         </Card>
 
         {/* News Tabs */}
-        <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
-            <TabsTrigger value="all">전체</TabsTrigger>
-            <TabsTrigger value="policy">정책</TabsTrigger>
-            <TabsTrigger value="complex">단지</TabsTrigger>
-            <TabsTrigger value="transport">교통</TabsTrigger>
-            <TabsTrigger value="education">교육</TabsTrigger>
-            <TabsTrigger value="finance">금융</TabsTrigger>
-          </TabsList>
+<div className="space-y-6 rounded-xl bg-gradient-to-r from-blue-50 to-cyan-50 p-4 border border-blue-100">
+  <div className="grid w-full grid-cols-2 gap-3">
+    <a
+      href="https://seongnam.go.kr/city/1000052/30001/bbsList.do"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex h-11 items-center justify-center rounded-md border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-100 hover:text-blue-800"
+    >
+      성남시 새소식
+    </a>
 
-          {/* All News */}
-          <TabsContent value="all" className="space-y-4">
-            {newsItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-blue-100 rounded-lg flex flex-col items-center justify-center">
-                        <span className="text-xs text-blue-600 font-semibold">
-                          {item.date.split('.')[1]}월
-                        </span>
-                        <span className="text-lg font-bold text-blue-700">
-                          {item.date.split('.')[2]}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 line-clamp-2 break-all">{item.title}</h3>
-                        <Badge variant="outline" className="w-fit">{item.category}</Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          {/* Policy News */}
-          <TabsContent value="policy" className="space-y-4">
-            {categoryNews('정책').map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-purple-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 break-all">{item.title}</h3>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          {/* Complex News */}
-          <TabsContent value="complex" className="space-y-4">
-            {categoryNews('단지').map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 break-all">{item.title}</h3>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          {/* Transport News */}
-          <TabsContent value="transport" className="space-y-4">
-            {categoryNews('교통').map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-blue-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 break-all">{item.title}</h3>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          {/* Education News */}
-          <TabsContent value="education" className="space-y-4">
-            {categoryNews('교육').map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-yellow-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 break-all">{item.title}</h3>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          {/* Finance News */}
-          <TabsContent value="finance" className="space-y-4">
-            {categoryNews('금융').map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="py-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0 mx-auto sm:mx-0">
-                      <div className="w-16 h-16 bg-red-100 rounded-lg flex items-center justify-center">
-                        <FileText className="w-8 h-8 text-red-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 break-all">{item.title}</h3>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-all">{item.summary}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                          <span>{item.source}</span>
-                          <span>·</span>
-                          <span>{item.date}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit"
-                          onClick={() => handleViewNewsDetail(item)}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          뉴스 상세 정보 보기
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
+    <a
+      href="https://seongnam.go.kr/city/1001101/30565/bbsList.do"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex h-11 items-center justify-center rounded-md border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 hover:text-emerald-800"
+    >
+      성남시 도시정비
+    </a>
+  </div>
+</div>      
 
         {/* Subscription CTA */}
         <Card className="mt-8 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
