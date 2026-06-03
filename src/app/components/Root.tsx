@@ -514,15 +514,20 @@ export function Root() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-              <div className="w-10 h-10 flex items-center justify-center">
-  <img
-                  src={seongnamLogo}
-                  alt="성남시 로고"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <span className="font-bold text-gray-600 text-[20px]">성남시 개발톡톡(talktalk)</span>
+              <div className="flex items-center gap-2">
+  <div className="w-10 h-10 flex items-center justify-center shrink-0">
+    <img
+      src={seongnamLogo}
+      alt="성남시 로고"
+      className="w-full h-full object-contain"
+    />
+  </div>
+
+  <div>
+    <span className="font-bold text-gray-600 text-[20px] leading-none">
+      성남시 개발톡톡(talktalk)
+    </span>
+  </div>
 </div>
               <p className="text-sm text-gray-600">
                 성남시 재개발, 재건축 정보 소통 플랫폼
