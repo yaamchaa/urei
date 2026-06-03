@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Home, LayoutDashboard, Users, Newspaper, BookOpen, Menu, X, Settings, User, LogOut, MapPin, Phone, TrendingUp, UserCog, CalendarDays, DollarSign, BarChart3, School, Bus, FileText, Rss, ChevronDown, ChevronRight, Building2, Image, Info, Car, Layers, LineChart, Shield, Bell } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import seongnamLogo from "figma:asset/6618bbf3a75e67ab50721119f6e09d28ed4f0e9b.png";
+import seongnamLogo from "figma:asset/seongnam-logo.png";
 import { useUser } from "../contexts/UserContext";
 import { useAnyId } from "../contexts/AnyIdContext";
 import { SkipNav } from "./SkipNav";
