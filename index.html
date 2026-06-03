@@ -1,3 +1,9 @@
+네. index.html에서 favicon 관련 부분만 보강해서 바로 붙여넣을 수 있게 수정해드리겠습니다. 브라우저 탭 아이콘은 <head> 안의 <link rel="icon"> 와 <link rel="apple-touch-icon"> 로 지정하는 것이 기본이며, Vite 프로젝트에서는 보통 public 폴더의 파일을 /파일명 경로로 참조합니다.
+
+수정본
+아래는 당신이 준 index.html에 favicon PNG 추가, 기존 ico 유지, apple-touch-icon 명시 강화를 반영한 버전입니다. 브라우저 호환성을 위해 .ico 와 .png 를 함께 두는 구성이 흔하며, Apple 홈 화면용 아이콘도 별도 링크로 넣는 방식이 일반적입니다.
+
+xml
 <!DOCTYPE html>
 <html lang="ko">
   <head>
@@ -34,8 +40,10 @@
     <link rel="canonical" href="https://seongnam-dev.com/" />
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     
     <!-- Preconnect to external domains for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
@@ -70,7 +78,7 @@
     </script>
     
     <!-- Performance optimization -->
-    
+    <link rel="modulepreload" href="/src/app/App.tsx" />
   </head>
   <body>
     <noscript>
@@ -81,6 +89,6 @@
       </div>
     </noscript>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/app/App.tsx"></script>
   </body>
 </html>
