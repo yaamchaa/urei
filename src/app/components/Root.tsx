@@ -516,14 +516,13 @@ export function Root() {
             <div>
               <div className="flex items-center gap-2 mb-3">
   <img
-    src="/seongnam-logo.png"
-    alt=""
-    aria-hidden="true"
-    className="w-8 h-8 object-contain shrink-0"
-  />
-  <h2 className="font-bold text-gray-900 m-0">
-    성남시 개발톡톡(talktalk)
-  </h2>
+                  src={seongnamLogo}
+                  alt="성남시 로고"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <span className="font-bold text-gray-600 text-[20px]">성남시 개발톡톡(talktalk)</span>
 </div>
               <p className="text-sm text-gray-600">
                 성남시 재개발, 재건축 정보 소통 플랫폼
