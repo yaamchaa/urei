@@ -284,7 +284,7 @@ export function NewsfeedPage() {
     </a>
 
     <a
-      href="https://seongnam.go.kr/city/1001101/30565/bbsList.do"
+      href="https://seongnam.go.kr/city/1001111/30302/bbsList.do"
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex h-11 items-center justify-center rounded-md border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 hover:text-emerald-800"
