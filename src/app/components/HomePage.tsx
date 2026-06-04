@@ -366,7 +366,7 @@ export function HomePage() {
               </a>
 
               <a
-                href="https://seongnam.go.kr/urbanRenewal/urbanRenewalDistrictArea.do?menuIdx=1001109&returnURL=%2Fmain.do"
+                href="https://seongnam.go.kr/city/1001111/30302/bbsList.do"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="정비구역 지번검색 외부 페이지 새 창 이동"
