@@ -361,7 +361,7 @@ export function HomePage() {
               >
                <Button size="lg" variant="secondary" className="w-full">
                 <Newspaper className="w-5 h-5 mr-2" aria-hidden="true" />
-                 시정소식 뉴스(새창)
+                 시정소식 뉴스
                 </Button>
               </a>
 
@@ -373,7 +373,8 @@ export function HomePage() {
                 className="no-underline"
               >
                 <Button size="lg" variant="secondary" className="w-full">
-                  정비구역 지번검색(새창)
+                  <Search className="w-5 h-5 mr-2" aria-hidden="true" />
+                  정비구역 지번검색
                 </Button>
               </a>
             </div>
