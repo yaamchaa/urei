@@ -337,7 +337,7 @@ export function HomePage() {
           <CardContent className="py-12 text-center">
             <h2 id="cta-title" className="text-xl font-bold mb-4">더 많은 정보가 필요하신가요?</h2>
             <p className="mb-6 text-blue-100">
-              '시민광장 톡톡' 지원센터에 질문하세요.
+              시민광장 '센터톡톡'에 질문하세요.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
               <Link to="/community" aria-label="시민광장으로 이동" className="no-underline">
