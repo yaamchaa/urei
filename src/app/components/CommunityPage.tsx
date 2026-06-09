@@ -402,6 +402,9 @@ export function CommunityPage() {
   
   // Q&A 질문 표시 개수 (처음 4개, 더 보기 클릭 시 10개씩 추가)
   const [visibleQuestionsCount, setVisibleQuestionsCount] = useState(4);
+
+  // 검색 상태
+  const [searchQuery, setSearchQuery] = useState("");
   
   // 댓글 관련 상태
   const [expandedMessageId, setExpandedMessageId] = useState<number | null>(null);
@@ -778,12 +781,35 @@ export function CommunityPage() {
 
             {/* Questions List */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              {/* 검색창 */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="text-lg font-bold text-gray-900">최근 문의</h3>
-                <Badge variant="secondary">{questions.length}개 문의</Badge>
+                <div className="w-full sm:w-auto sm:flex-1 sm:max-w-md">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="제목으로 검색 (2글자 이상)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-4"
+                    />
+                  </div>
+                </div>
+                <Badge variant="secondary" className="whitespace-nowrap">
+                  {searchQuery.length >= 2
+                    ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase())).length
+                    : questions.length}개 문의
+                </Badge>
               </div>
 
-              {questions.slice(0, visibleQuestionsCount).map((q) => {
+              {(() => {
+                // 검색 필터링 로직
+                const filteredQuestions = searchQuery.length >= 2
+                  ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                  : questions;
+
+                return filteredQuestions.slice(0, visibleQuestionsCount).map((q) => {
                 return (
                 <Card key={q.id} className="bg-gray-50">
                   {/* 질문 본문 */}
@@ -889,22 +915,37 @@ export function CommunityPage() {
                     </div>                 
                   )}
                 </Card>
-               );
-             })}
-                            
-              {/* 더 보기 버튼 */}
-              {questions.length > visibleQuestionsCount && (
-                <div className="border-t pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setVisibleQuestionsCount(prev => prev + 10)}
-                    className="w-full"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    더 보기 ({questions.length - visibleQuestionsCount}개 질문 더 보기)
-                  </Button>
+                );
+              })})()}
+
+              {/* 검색 결과 없음 */}
+              {searchQuery.length >= 2 && questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  <Search className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                  <p className="font-semibold">검색 결과가 없습니다</p>
+                  <p className="text-sm mt-1">다른 검색어를 입력해주세요</p>
                 </div>
               )}
+                            
+              {/* 더 보기 버튼 */}
+              {(() => {
+                const filteredQuestions = searchQuery.length >= 2
+                  ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                  : questions;
+
+                return filteredQuestions.length > visibleQuestionsCount && (
+                  <div className="border-t pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setVisibleQuestionsCount(prev => prev + 10)}
+                      className="w-full"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      더 보기 ({filteredQuestions.length - visibleQuestionsCount}개 질문 더 보기)
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
           </TabsContent>
 
