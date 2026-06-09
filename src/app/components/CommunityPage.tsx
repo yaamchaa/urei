@@ -1,7 +1,7 @@
 // CommunityPage v2.2.0 - 완전 익명 참여 (회원가입 없음) - Build 2026.04.11
 import { useState, useEffect } from "react";
 import { useSearchParams, useLocation } from "react-router";
-import { MessageSquare, ThumbsUp, Send, TrendingUp, AlertCircle, Users, Shield, MapPin, Eye, EyeOff, Trash2 } from "lucide-react";
+import { MessageSquare, ThumbsUp, Send, TrendingUp, AlertCircle, Users, Shield, MapPin, Eye, EyeOff, Trash2, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -405,11 +405,11 @@ export function CommunityPage() {
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // 댓글 관련 상태
   const [expandedMessageId, setExpandedMessageId] = useState<number | null>(null);
   const [replyContent, setReplyContent] = useState("");
-  
+
   // Q&A 답변 관련 상태
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
   const [answerContent, setAnswerContent] = useState("");
@@ -926,7 +926,7 @@ export function CommunityPage() {
                   <p className="text-sm mt-1">다른 검색어를 입력해주세요</p>
                 </div>
               )}
-                            
+
               {/* 더 보기 버튼 */}
               {(() => {
                 const filteredQuestions = searchQuery.length >= 2
