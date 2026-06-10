@@ -6,8 +6,19 @@
 import { Hono } from "npm:hono";
 import { logger } from "npm:hono/logger";
 import { cors } from "npm:hono/cors";
-import bcrypt from "npm:bcryptjs";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
+
+const app = new Hono();
+
+app.use("*", logger());
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+  }),
+);
 
 // 성남시 개발 톡톡 AI 챗봇 서버 - OpenAI GPT-4o-mini
 // Project: bundang rebuild 360 (chmbbclexcwtgwkntzxw)
@@ -15,21 +26,18 @@ import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 const ADMIN_API_TOKEN = Deno.env.get("ADMIN_API_TOKEN")!;
 const PASSWORD_PEPPER = Deno.env.get("PASSWORD_PEPPER") || "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+const ANY_ID_ENABLED = Deno.env.get("ANY_ID_ENABLED") === "true";
+const ANY_ID_BRIDGE_BASE_URL = Deno.env.get("ANY_ID_BRIDGE_BASE_URL") || "";
 
 // ========================================
 // Any-ID 환경 변수
 // ========================================
-const ANY_ID_ENABLED =
-  Deno.env.get("ANY_ID_ENABLED") === "true";
-const ANY_ID_CLIENT_ID = Deno.env.get("ANY_ID_CLIENT_ID") || "";
-const ANY_ID_CLIENT_SECRET =
-  Deno.env.get("ANY_ID_CLIENT_SECRET") || "";
-const ANY_ID_AGENCY_CODE =
-  Deno.env.get("ANY_ID_AGENCY_CODE") || "";
-const ANY_ID_API_URL =
-  Deno.env.get("ANY_ID_API_URL") || "https://test-anyid.go.kr";
-const ANY_ID_REDIRECT_URI =
-  Deno.env.get("ANY_ID_REDIRECT_URI") || "";
+const ANY_ID_ENABLED = Deno.env.get("ANY_ID_ENABLED") === "true";
+
+// Supabase가 직접 Any-ID OAuth를 처리하지 않고,
+// Java 중계서버와 통신
+const ANY_ID_BRIDGE_BASE_URL =
+  Deno.env.get("ANY_ID_BRIDGE_BASE_URL") || ""; 
 
 // ========================================
 // KV Store Functions (inline)
@@ -40,97 +48,35 @@ const kvClient = () =>
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-const kvSet = async (
-  key: string,
-  value: any,
-): Promise<void> => {
-  try {
-    const supabase = kvClient();
-    const { error } = await supabase
-      .from("kv_store_66444bd0")
-      .upsert({
-        key,
-        value,
-      });
-    if (error) {
-      console.error(
-        `kvSet error for key "${key}":`,
-        error.message,
-      );
-      throw new Error(error.message);
-    }
-  } catch (err: any) {
-    console.error(`kvSet exception for key "${key}":`, err);
-    throw err;
-  }
+const kvSet = async (key: string, value: unknown): Promise<void> => {
+  const supabase = kvClient();
+  const { error } = await supabase
+    .from("kv_store_66444bd0")
+    .upsert({ key, value });
+
+  if (error) throw new Error(error.message);
 };
 
 const kvGet = async (key: string): Promise<any> => {
-  try {
-    const supabase = kvClient();
-    const { data, error } = await supabase
-      .from("kv_store_66444bd0")
-      .select("value")
-      .eq("key", key)
-      .maybeSingle();
-    if (error) {
-      console.error(
-        `kvGet error for key "${key}":`,
-        error.message,
-      );
-      throw new Error(error.message);
-    }
-    return data?.value;
-  } catch (err: any) {
-    console.error(`kvGet exception for key "${key}":`, err);
-    throw err;
-  }
+  const supabase = kvClient();
+  const { data, error } = await supabase
+    .from("kv_store_66444bd0")
+    .select("value")
+    .eq("key", key)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data?.value;
 };
 
 const kvDel = async (key: string): Promise<void> => {
-  try {
-    const supabase = kvClient();
-    const { error } = await supabase
-      .from("kv_store_66444bd0")
-      .delete()
-      .eq("key", key);
-    if (error) {
-      console.error(
-        `kvDel error for key "${key}":`,
-        error.message,
-      );
-      throw new Error(error.message);
-    }
-  } catch (err: any) {
-    console.error(`kvDel exception for key "${key}":`, err);
-    throw err;
-  }
-};
+  const supabase = kvClient();
+  const { error } = await supabase
+    .from("kv_store_66444bd0")
+    .delete()
+    .eq("key", key);
 
-const kvGetByPrefix = async (
-  prefix: string,
-): Promise<any[]> => {
-  try {
-    const supabase = kvClient();
-    const { data, error } = await supabase
-      .from("kv_store_66444bd0")
-      .select("key, value")
-      .like("key", prefix + "%");
-    if (error) {
-      console.error(
-        `kvGetByPrefix error for prefix "${prefix}":`,
-        error.message,
-      );
-      throw new Error(error.message);
-    }
-    return data?.map((d) => d.value) ?? [];
-  } catch (err: any) {
-    console.error(
-      `kvGetByPrefix exception for prefix "${prefix}":`,
-      err,
-    );
-    throw err;
-  }
+  if (error) throw new Error(error.message);
 };
 
 // ========================================
@@ -149,21 +95,24 @@ interface AnyIdAuthRequest {
   returnUrl?: string;
 }
 
-interface AnyIdAuthResponse {
-  ci: string;
-  name: string;
-  birthDate: string;
+interface AnyIdBridgeVerifyResponse {
+  success: boolean;
+  ci?: string;
+  authMethod?: string;
+  authLevel?: string;
+  name?: string;
   phoneNumber?: string;
-  email?: string;
-  businessNumber?: string;
-  businessName?: string;
+  verifiedAt?: string;
 }
 
-interface AnyIdTokenResponse {
-  accessToken: string;
-  tokenType: string;
-  expiresIn: number;
-  refreshToken?: string;
+interface AnyIdSessionData {
+  sessionId: string;
+  userKey: string;
+  verified: true;
+  authMethod?: string;
+  authLevel?: string;
+  verifiedAt: string;
+  expiresAt: string;
 }
 
 // ========================================
@@ -171,136 +120,7 @@ interface AnyIdTokenResponse {
 // ========================================
 
 function isAnyIdEnabled(): boolean {
-  return (
-    ANY_ID_ENABLED &&
-    !!ANY_ID_CLIENT_ID &&
-    !!ANY_ID_CLIENT_SECRET
-  );
-}
-
-function generateAnyIdAuthUrl(
-  authMethod: AnyIdAuthMethod,
-  state: string,
-): string {
-  if (!isAnyIdEnabled()) {
-    throw new Error(
-      "Any-ID가 활성화되지 않았습니다. 환경 변수를 확인하세요.",
-    );
-  }
-
-  const params = new URLSearchParams({
-    client_id: ANY_ID_CLIENT_ID,
-    redirect_uri: ANY_ID_REDIRECT_URI,
-    response_type: "code",
-    state: state,
-    auth_method: authMethod,
-    agency_code: ANY_ID_AGENCY_CODE,
-  });
-
-  return `${ANY_ID_API_URL}/oauth2/authorize?${params.toString()}`;
-}
-
-async function exchangeAnyIdCode(
-  code: string,
-): Promise<AnyIdTokenResponse> {
-  if (!isAnyIdEnabled()) {
-    throw new Error("Any-ID가 활성화되지 않았습니다.");
-  }
-
-  const response = await fetch(
-    `${ANY_ID_API_URL}/oauth2/token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code: code,
-        client_id: ANY_ID_CLIENT_ID,
-        client_secret: ANY_ID_CLIENT_SECRET,
-        redirect_uri: ANY_ID_REDIRECT_URI,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Any-ID 토큰 발급 실패: ${error}`);
-  }
-
-  return await response.json();
-}
-
-async function getAnyIdUserInfo(
-  accessToken: string,
-): Promise<AnyIdAuthResponse> {
-  if (!isAnyIdEnabled()) {
-    throw new Error("Any-ID가 활성화되지 않았습니다.");
-  }
-
-  const response = await fetch(
-    `${ANY_ID_API_URL}/api/v1/userinfo`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Any-ID 사용자 정보 조회 실패: ${error}`);
-  }
-
-  const data = await response.json();
-
-  return {
-    ci: data.ci || data.connectingInformation,
-    name: data.name || data.userName,
-    birthDate: data.birthDate || data.birthday,
-    phoneNumber: data.phoneNumber || data.mobileNo,
-    email: data.email,
-    businessNumber: data.businessNumber,
-    businessName: data.businessName,
-  };
-}
-
-async function findOrCreateUserByCi(
-  userInfo: AnyIdAuthResponse,
-): Promise<string> {
-  const existingUser = await kvGet(`anyid:ci:${userInfo.ci}`);
-
-  if (existingUser) {
-    await kvSet(`anyid:user:${existingUser.userId}`, {
-      ...existingUser,
-      name: userInfo.name,
-      phoneNumber: userInfo.phoneNumber,
-      updatedAt: new Date().toISOString(),
-    });
-
-    return existingUser.userId;
-  }
-
-  const userId = crypto.randomUUID();
-  const newUser = {
-    userId,
-    ci: userInfo.ci,
-    name: userInfo.name,
-    birthDate: userInfo.birthDate,
-    phoneNumber: userInfo.phoneNumber,
-    email: userInfo.email,
-    authMethod: "anyid",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  await kvSet(`anyid:ci:${userInfo.ci}`, newUser);
-  await kvSet(`anyid:user:${userId}`, newUser);
-
-  return userId;
+  return ANY_ID_ENABLED && !!ANY_ID_BRIDGE_BASE_URL;
 }
 
 function generateState(): string {
@@ -310,16 +130,38 @@ function generateState(): string {
 function getAnyIdNotEnabledResponse() {
   return {
     error: "Any-ID 인증이 활성화되지 않았습니다",
-    message: "API 키 발급 후 환경 변수를 설정해주세요",
+    message: "Java Any-ID 중계앱 또는 환경변수를 확인해주세요",
     enabled: false,
-    requiredEnvVars: [
+    required: [
       "ANY_ID_ENABLED=true",
-      "ANY_ID_CLIENT_ID",
-      "ANY_ID_CLIENT_SECRET",
-      "ANY_ID_AGENCY_CODE",
-      "ANY_ID_REDIRECT_URI",
+      "ANY_ID_BRIDGE_BASE_URL",
     ],
   };
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(input),
+  );
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function upsertVerifiedUser(ci: string) {
+  const ciHash = await sha256Hex(ci + PASSWORD_PEPPER);
+  const userKey = `anyid:user:${ciHash}`;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+
+  await kvSet(userKey, {
+    ciHash,
+    verifiedAt: now.toISOString(),
+    expiresAt,
+  });
+
+  return { ciHash, userKey, expiresAt };
 }
 
 // ========================================
@@ -4596,79 +4438,22 @@ function randomString(length: number): string {
   return result;
 }
 
-// ========================================
-// Analytics Configuration API
-// ========================================
+// ==============================
+// ANY-ID APIs
+// ==============================
 
-// GET /analytics/config - 통계 설정 조회
-app.get("/make-server-66444bd0/analytics/config", async (c) => {
-  console.log("GET /analytics/config called");
-
-  try {
-    const key = "analytics_config";
-    const data = await kvGet(key);
-
-    if (!data) {
-      return c.json({
-        ga_tracking_id: null,
-        clarity_project_id: null,
-      });
-    }
-
-    return c.json(data);
-  } catch (error: any) {
-    console.error("Analytics config fetch error:", error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// PUT /analytics/config - 통계 설정 업데이트
-app.put("/make-server-66444bd0/analytics/config", async (c) => {
-  console.log("PUT /analytics/config called");
-
-  try {
-    const body = await c.req.json();
-    const { ga_tracking_id, clarity_project_id } = body;
-
-    const timestamp = new Date().toISOString();
-    const configData = {
-      ga_tracking_id: ga_tracking_id || null,
-      clarity_project_id: clarity_project_id || null,
-      updated_at: timestamp,
-    };
-
-    // KV store에 저장
-    const key = "analytics_config";
-    await kvSet(key, configData);
-
-    console.log("Analytics config updated:", configData);
-    return c.json({ success: true, data: configData });
-  } catch (error: any) {
-    console.error("Analytics config update error:", error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// ========================================
-// Any-ID 정부 통합인증 API
-// ========================================
-
-// GET /anyid/status - Any-ID 활성화 상태 확인
-app.get("/make-server-f75f5f59/anyid/status", async (c) => {
-  console.log("GET /anyid/status called");
-
+// 상태 확인
+app.get("/make-server-66444bd0/anyid/status", async (c) => {
   return c.json({
     enabled: isAnyIdEnabled(),
     message: isAnyIdEnabled()
       ? "Any-ID 인증이 활성화되었습니다."
-      : "Any-ID API 키를 설정해주세요.",
+      : "Java Any-ID 중계앱 연결이 필요합니다.",
   });
 });
 
-// POST /anyid/auth/init - Any-ID 인증 시작
-app.post("/make-server-f75f5f59/anyid/auth/init", async (c) => {
-  console.log("POST /anyid/auth/init called");
-
+// 인증 시작
+app.post("/make-server-66444bd0/anyid/auth/init", async (c) => {
   if (!isAnyIdEnabled()) {
     return c.json(getAnyIdNotEnabledResponse(), 503);
   }
@@ -4681,165 +4466,127 @@ app.post("/make-server-f75f5f59/anyid/auth/init", async (c) => {
       return c.json({ error: "authMethod is required" }, 400);
     }
 
-    // CSRF 방지용 상태값 생성
     const state = generateState();
 
-    // 상태값 저장 (5분간 유효)
     await kvSet(`anyid:state:${state}`, {
       authMethod,
-      returnUrl,
+      returnUrl: returnUrl || null,
       createdAt: new Date().toISOString(),
     });
 
-    // Any-ID 인증 URL 생성
-    const authUrl = generateAnyIdAuthUrl(authMethod, state);
-
-    console.log(`✅ Any-ID 인증 URL 생성: ${authMethod}`);
-    return c.json({ authUrl, state });
+    return c.json({
+      success: true,
+      state,
+      launchUrl:
+        `${ANY_ID_BRIDGE_BASE_URL}/login/login.jsp?state=${encodeURIComponent(state)}&authMethod=${encodeURIComponent(authMethod)}`,
+    });
   } catch (error: any) {
-    console.error("Any-ID auth init error:", error);
     return c.json({ error: error.message }, 500);
   }
 });
 
-// GET /anyid/auth/callback - Any-ID 인증 콜백
-app.get(
-  "/make-server-f75f5f59/anyid/auth/callback",
-  async (c) => {
-    console.log("GET /anyid/auth/callback called");
+// 인증 콜백
+app.get("/make-server-66444bd0/anyid/auth/callback", async (c) => {
+  if (!isAnyIdEnabled()) {
+    return c.json(getAnyIdNotEnabledResponse(), 503);
+  }
 
-    if (!isAnyIdEnabled()) {
-      return c.json(getAnyIdNotEnabledResponse(), 503);
+  try {
+    const state = c.req.query("state");
+    const resultToken = c.req.query("resultToken");
+
+    if (!state || !resultToken) {
+      return c.json({ error: "state or resultToken is missing" }, 400);
     }
 
-    try {
-      const code = c.req.query("code");
-      const state = c.req.query("state");
-      const error = c.req.query("error");
-
-      // 인증 실패
-      if (error) {
-        console.error("Any-ID 인증 실패:", error);
-        return c.json(
-          { error: "인증이 실패했습니다", details: error },
-          400,
-        );
-      }
-
-      // 파라미터 검증
-      if (!code || !state) {
-        return c.json(
-          { error: "code or state is missing" },
-          400,
-        );
-      }
-
-      // 상태값 검증 (CSRF 방지)
-      const storedState = await kvGet(`anyid:state:${state}`);
-      if (!storedState) {
-        return c.json(
-          { error: "Invalid or expired state" },
-          400,
-        );
-      }
-
-      // 사용한 상태값 삭제
-      await kvDel(`anyid:state:${state}`);
-
-      // 인증 코드로 토큰 발급
-      const tokenResponse = await exchangeAnyIdCode(code);
-
-      // 토큰으로 사용자 정보 조회
-      const userInfo = await getAnyIdUserInfo(
-        tokenResponse.accessToken,
-      );
-
-      // CI로 사용자 조회 또는 생성
-      const userId = await findOrCreateUserByCi(userInfo);
-
-      // 세션 생성
-      const sessionId = crypto.randomUUID();
-      const sessionData = {
-        userId,
-        ci: userInfo.ci,
-        name: userInfo.name,
-        authMethod: "anyid",
-        createdAt: new Date().toISOString(),
-      };
-
-      await kvSet(`anyid:session:${sessionId}`, sessionData);
-
-      console.log(
-        `✅ Any-ID 인증 성공: ${userInfo.name} (CI: ${userInfo.ci})`,
-      );
-
-      return c.json({
-        success: true,
-        sessionId,
-        user: {
-          userId,
-          name: userInfo.name,
-          birthDate: userInfo.birthDate,
-          phoneNumber: userInfo.phoneNumber,
-        },
-      });
-    } catch (error: any) {
-      console.error("Any-ID callback error:", error);
-      return c.json({ error: error.message }, 500);
-    }
-  },
-);
-
-// GET /anyid/session/:sessionId - Any-ID 세션 조회
-app.get(
-  "/make-server-f75f5f59/anyid/session/:sessionId",
-  async (c) => {
-    console.log("GET /anyid/session/:sessionId called");
-
-    if (!isAnyIdEnabled()) {
-      return c.json(getAnyIdNotEnabledResponse(), 503);
+    const storedState = await kvGet(`anyid:state:${state}`);
+    if (!storedState) {
+      return c.json({ error: "Invalid or expired state" }, 400);
     }
 
-    try {
-      const sessionId = c.req.param("sessionId");
-      const sessionData = await kvGet(
-        `anyid:session:${sessionId}`,
-      );
+    await kvDel(`anyid:state:${state}`);
 
-      if (!sessionData) {
-        return c.json({ error: "Session not found" }, 404);
-      }
+    const verifyResp = await fetch(
+      `${ANY_ID_BRIDGE_BASE_URL}/bridge/api/verify-result?resultToken=${encodeURIComponent(resultToken)}`,
+      { method: "GET" },
+    );
 
-      return c.json({ session: sessionData });
-    } catch (error: any) {
-      console.error("Any-ID session fetch error:", error);
-      return c.json({ error: error.message }, 500);
-    }
-  },
-);
-
-// DELETE /anyid/session/:sessionId - Any-ID 로그아웃
-app.delete(
-  "/make-server-f75f5f59/anyid/session/:sessionId",
-  async (c) => {
-    console.log("DELETE /anyid/session/:sessionId called");
-
-    if (!isAnyIdEnabled()) {
-      return c.json(getAnyIdNotEnabledResponse(), 503);
+    if (!verifyResp.ok) {
+      const msg = await verifyResp.text();
+      return c.json({ error: `bridge verify failed: ${msg}` }, 502);
     }
 
-    try {
-      const sessionId = c.req.param("sessionId");
-      await kvDel(`anyid:session:${sessionId}`);
+    const verified: AnyIdBridgeVerifyResponse = await verifyResp.json();
 
-      console.log(`✅ Any-ID 로그아웃: ${sessionId}`);
-      return c.json({ success: true });
-    } catch (error: any) {
-      console.error("Any-ID logout error:", error);
-      return c.json({ error: error.message }, 500);
+    if (!verified.success || !verified.ci) {
+      return c.json({ error: "verification failed" }, 400);
     }
-  },
-);
+
+    const { userKey, expiresAt } = await upsertVerifiedUser(verified.ci);
+
+    const sessionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const sessionData: AnyIdSessionData = {
+      sessionId,
+      userKey,
+      verified: true,
+      authMethod: verified.authMethod,
+      authLevel: verified.authLevel,
+      verifiedAt: verified.verifiedAt || now,
+      expiresAt,
+    };
+
+    await kvSet(`anyid:session:${sessionId}`, sessionData);
+
+    return c.json({
+      success: true,
+      sessionId,
+      verified: true,
+      expiresAt,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// 세션 조회
+app.get("/make-server-66444bd0/anyid/session/:sessionId", async (c) => {
+  if (!isAnyIdEnabled()) {
+    return c.json(getAnyIdNotEnabledResponse(), 503);
+  }
+
+  try {
+    const sessionId = c.req.param("sessionId");
+    const session = await kvGet(`anyid:session:${sessionId}`);
+
+    if (!session) {
+      return c.json({ error: "Session not found" }, 404);
+    }
+
+    return c.json({ session });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// 로그아웃
+app.delete("/make-server-66444bd0/anyid/session/:sessionId", async (c) => {
+  if (!isAnyIdEnabled()) {
+    return c.json(getAnyIdNotEnabledResponse(), 503);
+  }
+
+  try {
+    const sessionId = c.req.param("sessionId");
+    await kvDel(`anyid:session:${sessionId}`);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+Deno.serve(app.fetch);
 
 // ========================================
 // 안내 배너 관리 API
