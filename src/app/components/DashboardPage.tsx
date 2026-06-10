@@ -267,29 +267,36 @@ export function DashboardPage() {
 
   // 서버에서 추가 정보 로드
   useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const safeFetch = async (url: string) => {
+      try {
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${publicAnonKey}` },
+          signal,
+        });
+        return res.ok ? res : null;
+      } catch {
+        return null;
+      }
+    };
+
     const fetchExtraData = async () => {
       setIsLoadingExtraData(true);
       try {
         // 학군 정보 로드
-        const schoolResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/school-info?complex_id=${selectedComplex}`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const schoolResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/school-info?complex_id=${selectedComplex}`
         );
         
-        if (schoolResponse.ok) {
+        if (schoolResponse) {
           const schoolData = await schoolResponse.json();
           if (schoolData.schools) {
-            // schools가 객체인 경우와 배열인 경우 처리
             if (typeof schoolData.schools === 'object' && !Array.isArray(schoolData.schools)) {
-              // {schools: [...], studentProjection: "..."} 형식
               setSchoolInfo(schoolData.schools.schools?.map((s: any) => s.name || s) || []);
               setStudentProjection(schoolData.schools.studentProjection || "");
             } else {
-              // 배열 형식 (이전 버전)
               setSchoolInfo(schoolData.schools.map((s: any) => s.name || s));
               setStudentProjection("");
             }
@@ -303,19 +310,13 @@ export function DashboardPage() {
         }
 
         // 교통 정보 로드
-        const transportResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/transport-info?complex_id=${selectedComplex}`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const transportResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/transport-info?complex_id=${selectedComplex}`
         );
-        
-        if (transportResponse.ok) {
+
+        if (transportResponse) {
           const transportData = await transportResponse.json();
           if (transportData.transport_info) {
-            // transport_info가 객체인 경우와 문자열인 경우 처리
             if (typeof transportData.transport_info === 'object') {
               setTransportInfo(transportData.transport_info.info || complex.transportInfo);
               setTransportImprovementNote(transportData.transport_info.improvementNote || "정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
@@ -333,64 +334,37 @@ export function DashboardPage() {
         }
 
         // 비고 정보 로드
-        const notesResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/notes?complex_id=${selectedComplex}`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const notesResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/notes?complex_id=${selectedComplex}`
         );
-        
-        if (notesResponse.ok) {
+
+        if (notesResponse) {
           const notesData = await notesResponse.json();
-          if (notesData.notes) {
-            setNotes(notesData.notes);
-          } else {
-            setNotes(complex.notes);
-          }
+          setNotes(notesData.notes || complex.notes);
         } else {
           setNotes(complex.notes);
         }
 
         // 용적률/건폐율 정보 로드
-        const ratioResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/floor-area-ratio?complex_id=${selectedComplex}`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const ratioResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/floor-area-ratio?complex_id=${selectedComplex}`
         );
 
-        if (ratioResponse.ok) {
+        if (ratioResponse) {
           const ratioData = await ratioResponse.json();
-          if (ratioData.floor_area_ratio) {
-            setFloorAreaRatio(ratioData.floor_area_ratio);
-          } else {
-            setFloorAreaRatio(complex.floorAreaRatio);
-          }
-          if (ratioData.building_coverage_ratio) {
-            setBuildingCoverageRatio(ratioData.building_coverage_ratio);
-          } else {
-            setBuildingCoverageRatio(complex.buildingCoverageRatio || "-");
-          }
+          setFloorAreaRatio(ratioData.floor_area_ratio || complex.floorAreaRatio);
+          setBuildingCoverageRatio(ratioData.building_coverage_ratio || complex.buildingCoverageRatio || "-");
         } else {
           setFloorAreaRatio(complex.floorAreaRatio);
           setBuildingCoverageRatio(complex.buildingCoverageRatio || "-");
         }
 
         // 주차 정보 로드
-        const parkingResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/parking`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const parkingResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/parking`
         );
 
-        if (parkingResponse.ok) {
+        if (parkingResponse) {
           const parkingData = await parkingResponse.json();
           const parkingItem = parkingData.find((item: any) => item.complex_id === selectedComplex);
           if (parkingItem) {
@@ -406,38 +380,24 @@ export function DashboardPage() {
         }
 
         // 층수 정보 로드
-        const floorsResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/floors`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const floorsResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/floors`
         );
 
-        if (floorsResponse.ok) {
+        if (floorsResponse) {
           const floorsData = await floorsResponse.json();
           const floorsItem = floorsData.find((item: any) => item.complex_id === selectedComplex);
-          if (floorsItem) {
-            setMaxFloors(floorsItem.max_floors);
-          } else {
-            setMaxFloors(complex.maxFloors);
-          }
+          setMaxFloors(floorsItem ? floorsItem.max_floors : complex.maxFloors);
         } else {
           setMaxFloors(complex.maxFloors);
         }
 
         // 기본정보 로드
-        const basicInfoResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/basic-info`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const basicInfoResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/basic-info`
         );
 
-        if (basicInfoResponse.ok) {
+        if (basicInfoResponse) {
           const basicInfoData = await basicInfoResponse.json();
           const basicInfoItem = basicInfoData.find((item: any) => item.complex_id === selectedComplex);
           if (basicInfoItem && basicInfoItem.subDistricts) {
@@ -456,43 +416,27 @@ export function DashboardPage() {
         }
 
         // 분담금 안내 내용 로드
-        const guideResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/contribution-guide`,
-          {
-            headers: {
-              Authorization: `Bearer ${publicAnonKey}`,
-            },
-          }
+        const guideResponse = await safeFetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/contribution-guide`
         );
 
-        if (guideResponse.ok) {
+        if (guideResponse) {
           const guideData = await guideResponse.json();
           if (guideData.content) {
             setContributionGuide(guideData.content);
           }
         }
-      } catch (error) {
-        console.error("추가 정보 로드 실패:", error);
-        // 에러 시 기본값 사용
-        setSchoolInfo(complex.nearbySchools);
-        setTransportInfo(complex.transportInfo);
-        setNotes(complex.notes);
-        setStudentProjection(complex.studentProjection || "");
-        setTransportImprovementNote("정비사업 완료 시 교통 여건이 크게 개선될 것으로 예상됩니다.");
-        setFloorAreaRatio(complex.floorAreaRatio);
-        setBuildingCoverageRatio(complex.buildingCoverageRatio || "-");
-        setParkingBefore(complex.parkingBefore);
-        setParkingAfter(complex.parkingAfter);
-        setMaxFloors(complex.maxFloors);
-        setSubDistricts(complex.subDistricts || []);
-        setServerTotalHouseholdsBefore("");
-        setServerTotalHouseholdsAfter("");
+      } catch {
+        // abort 등 예외 시 기본값 유지 (이미 safeFetch에서 처리됨)
       } finally {
-        setIsLoadingExtraData(false);
+        if (!signal.aborted) {
+          setIsLoadingExtraData(false);
+        }
       }
     };
 
     fetchExtraData();
+    return () => controller.abort();
   }, [selectedComplex]);
 
   // 단지 목록 로딩 중일 때
