@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Switch } from "./ui/switch";
-import { projectId, publicAnonKey } from "../../../utils/supabase/info.tsx";
+import { projectId, publicAnonKey } from "../../utils/supabase/info.tsx";
 import { useUser } from "../contexts/UserContext";
 import { useAnyId } from "../contexts/AnyIdContext";
 import { trackEvent, trackClarityEvent } from "./Analytics";
@@ -405,6 +405,7 @@ export function CommunityPage() {
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<"title_content" | "title" | "content">("title_content");
 
   // 댓글 관련 상태
   const [expandedMessageId, setExpandedMessageId] = useState<number | null>(null);
@@ -785,20 +786,42 @@ export function CommunityPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="text-lg font-bold text-gray-900">최근 문의</h3>
                 <div className="w-full sm:w-auto sm:flex-1 sm:max-w-md">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="제목으로 검색 (2글자 이상)"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 pr-4"
-                    />
+                  {/* 모바일: 드롭다운이 검색창 위에 전체 너비로 */}
+                  <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
+                    <Select value={searchType} onValueChange={(v) => setSearchType(v as typeof searchType)}>
+                      <SelectTrigger className="w-full sm:w-[130px] border-gray-300 bg-gray-50 focus:ring-0 focus:ring-offset-0 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="title_content">제목+내용</SelectItem>
+                        <SelectItem value="title">제목</SelectItem>
+                        <SelectItem value="content">내용</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder={
+                          searchType === "title_content" ? "제목+내용 검색 (2글자 이상)" :
+                          searchType === "title" ? "제목으로 검색 (2글자 이상)" :
+                          "내용으로 검색 (2글자 이상)"
+                        }
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 pr-4"
+                      />
+                    </div>
                   </div>
                 </div>
                 <Badge variant="secondary" className="whitespace-nowrap">
                   {searchQuery.length >= 2
-                    ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase())).length
+                    ? questions.filter(q => {
+                        const kw = searchQuery.toLowerCase();
+                        if (searchType === "title") return q.title.toLowerCase().includes(kw);
+                        if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                        return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
+                      }).length
                     : questions.length}개 문의
                 </Badge>
               </div>
@@ -806,7 +829,12 @@ export function CommunityPage() {
               {(() => {
                 // 검색 필터링 로직
                 const filteredQuestions = searchQuery.length >= 2
-                  ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ? questions.filter(q => {
+                      const kw = searchQuery.toLowerCase();
+                      if (searchType === "title") return q.title.toLowerCase().includes(kw);
+                      if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                      return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
+                    })
                   : questions;
 
                 return filteredQuestions.slice(0, visibleQuestionsCount).map((q) => {
@@ -919,7 +947,12 @@ export function CommunityPage() {
               })})()}
 
               {/* 검색 결과 없음 */}
-              {searchQuery.length >= 2 && questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+              {searchQuery.length >= 2 && questions.filter(q => {
+                const kw = searchQuery.toLowerCase();
+                if (searchType === "title") return q.title.toLowerCase().includes(kw);
+                if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
+              }).length === 0 && (
                 <div className="text-center py-12 text-gray-500">
                   <Search className="w-12 h-12 mx-auto mb-2 opacity-30" />
                   <p className="font-semibold">검색 결과가 없습니다</p>
