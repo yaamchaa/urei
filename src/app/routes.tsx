@@ -6,6 +6,7 @@ import { RequirePrimaryAdmin } from "./components/RequirePrimaryAdmin";
 // Import critical components eagerly to avoid suspension issues
 import { HomePage } from "./components/HomePage";
 import { AdminLoginPage } from "./components/AdminLoginPage";
+import { CommunitySelectionPage } from "./components/CommunitySelectionPage";
 
 export const router = createHashRouter([
   {
@@ -42,7 +43,7 @@ export const router = createHashRouter([
       },
       {
         path: "community",
-        lazy: () => import("./components/CommunitySelectionPage").then(m => ({ Component: m.CommunitySelectionPage }))
+        Component: CommunitySelectionPage
       },
       {
         path: "community/bundang-reconstruction",
@@ -159,7 +160,16 @@ export const router = createHashRouter([
       },
       {
         path: "guide-management",
-        lazy: () => import("./components/GuideManagementPage").then(m => ({ Component: m.GuideManagementPage }))
+        lazy: async () => {
+          const { GuideManagementPage } = await import("./components/GuideManagementPage");
+          return {
+            Component: () => (
+              <RequireAdmin>
+                <GuideManagementPage />
+              </RequireAdmin>
+            )
+          };
+        }
       },
       {
         path: "community-management",
