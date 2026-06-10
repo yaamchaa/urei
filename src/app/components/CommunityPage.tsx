@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Switch } from "./ui/switch";
-import { projectId, publicAnonKey } from "../../utils/supabase/info.tsx";
+import { projectId, publicAnonKey } from "../../../utils/supabase/info.tsx";
 import { useUser } from "../contexts/UserContext";
 import { useAnyId } from "../contexts/AnyIdContext";
 import { trackEvent, trackClarityEvent } from "./Analytics";
