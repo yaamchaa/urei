@@ -1,43 +1,16 @@
-/// <reference no-default-lib="true" />
-/// <reference lib="deno.ns" />
-/// <reference lib="deno.unstable" />
-/// <reference lib="esnext" />
-
 import { Hono } from "npm:hono";
 import { logger } from "npm:hono/logger";
 import { cors } from "npm:hono/cors";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
+// bcryptjs: 순수 JS 구현 — Web Worker 불필요 (Edge Function 호환)
+import bcrypt from "npm:bcryptjs@2.4.3";
 
-const app = new Hono();
-
-app.use("*", logger());
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-  }),
-);
-
-// 성남시 개발 톡톡 AI 챗봇 서버 - OpenAI GPT-4o-mini
+// 성남시 개발 톡톡 서버
 // Project: bundang rebuild 360 (chmbbclexcwtgwkntzxw)
 
 const ADMIN_API_TOKEN = Deno.env.get("ADMIN_API_TOKEN")!;
 const PASSWORD_PEPPER = Deno.env.get("PASSWORD_PEPPER") || "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
-const ANY_ID_ENABLED = Deno.env.get("ANY_ID_ENABLED") === "true";
-const ANY_ID_BRIDGE_BASE_URL = Deno.env.get("ANY_ID_BRIDGE_BASE_URL") || "";
-
-// ========================================
-// Any-ID 환경 변수
-// ========================================
-const ANY_ID_ENABLED = Deno.env.get("ANY_ID_ENABLED") === "true";
-
-// Supabase가 직접 Any-ID OAuth를 처리하지 않고,
-// Java 중계서버와 통신
-const ANY_ID_BRIDGE_BASE_URL =
-  Deno.env.get("ANY_ID_BRIDGE_BASE_URL") || ""; 
 
 // ========================================
 // KV Store Functions (inline)
@@ -79,65 +52,20 @@ const kvDel = async (key: string): Promise<void> => {
   if (error) throw new Error(error.message);
 };
 
-// ========================================
-// Any-ID 타입 정의
-// ========================================
+const kvGetByPrefix = async (prefix: string): Promise<any[]> => {
+  const supabase = kvClient();
+  const { data, error } = await supabase
+    .from("kv_store_66444bd0")
+    .select("value")
+    .like("key", `${prefix}%`);
 
-type AnyIdAuthMethod =
-  | "mobile"
-  | "cert"
-  | "finance"
-  | "simple"
-  | "social";
-
-interface AnyIdAuthRequest {
-  authMethod: AnyIdAuthMethod;
-  returnUrl?: string;
-}
-
-interface AnyIdBridgeVerifyResponse {
-  success: boolean;
-  ci?: string;
-  authMethod?: string;
-  authLevel?: string;
-  name?: string;
-  phoneNumber?: string;
-  verifiedAt?: string;
-}
-
-interface AnyIdSessionData {
-  sessionId: string;
-  userKey: string;
-  verified: true;
-  authMethod?: string;
-  authLevel?: string;
-  verifiedAt: string;
-  expiresAt: string;
-}
+  if (error) throw new Error(error.message);
+  return (data || []).map((row: any) => row.value);
+};
 
 // ========================================
-// Any-ID 유틸리티 함수
+// 공통 유틸리티
 // ========================================
-
-function isAnyIdEnabled(): boolean {
-  return ANY_ID_ENABLED && !!ANY_ID_BRIDGE_BASE_URL;
-}
-
-function generateState(): string {
-  return crypto.randomUUID();
-}
-
-function getAnyIdNotEnabledResponse() {
-  return {
-    error: "Any-ID 인증이 활성화되지 않았습니다",
-    message: "Java Any-ID 중계앱 또는 환경변수를 확인해주세요",
-    enabled: false,
-    required: [
-      "ANY_ID_ENABLED=true",
-      "ANY_ID_BRIDGE_BASE_URL",
-    ],
-  };
-}
 
 async function sha256Hex(input: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest(
@@ -147,21 +75,6 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-}
-
-async function upsertVerifiedUser(ci: string) {
-  const ciHash = await sha256Hex(ci + PASSWORD_PEPPER);
-  const userKey = `anyid:user:${ciHash}`;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
-
-  await kvSet(userKey, {
-    ciHash,
-    verifiedAt: now.toISOString(),
-    expiresAt,
-  });
-
-  return { ciHash, userKey, expiresAt };
 }
 
 // ========================================
@@ -495,6 +408,7 @@ app.use(
       "x-client-info",
       "X-User-ID",
       "X-CSRF-Token",
+      "X-Admin-Id",
     ],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -518,7 +432,7 @@ app.use("*", async (c, next) => {
       "Access-Control-Allow-Methods":
         "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, apikey, x-client-info",
+        "Content-Type, Authorization, apikey, x-client-info, X-User-ID, X-CSRF-Token, X-Admin-Id",
       "Access-Control-Max-Age": "600",
       // 보안 헤더 추가
       "X-Content-Type-Options": "nosniff",
@@ -538,7 +452,7 @@ app.use("*", async (c, next) => {
   );
   c.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, apikey, x-client-info",
+    "Content-Type, Authorization, apikey, x-client-info, X-User-ID, X-CSRF-Token, X-Admin-Id",
   );
   c.header("Access-Control-Max-Age", "600");
 
@@ -2222,76 +2136,45 @@ app.get("/make-server-66444bd0/questions", async (c) => {
   try {
     // 카테고리 쿼리 파라미터 확인
     const categoryFilter = c.req.query("category");
-    console.log("Category filter:", categoryFilter);
 
-    // 🔒 현재 사용자 인증 확인
-    let currentUserId: string | null = null;
+    // 관리자 여부 확인
     let isAdmin = false;
-
-    // Admin 토큰 확인 (시민광장 관리에서 사용)
     const authHeader = c.req.header("Authorization");
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
-
       try {
         const adminSession = await kvGet(`admin_session:${token}`);
-        if (adminSession && adminSession.adminId) {
-          isAdmin = true;
-          currentUserId = adminSession.adminId;
-          console.log("✅ Request from admin:", currentUserId);
-        }
-      } catch (error) {
-        // Admin 세션이 없으면 일반 사용자로 처리
-      }
+        if (adminSession?.adminId) isAdmin = true;
+      } catch (_) { /* 일반 사용자 */ }
     }
 
-    // 일반 사용자 ID를 헤더로 받기 (Any-ID 또는 일반 사용자)
-    if (!currentUserId) {
-      currentUserId = c.req.header("X-User-ID") || null;
-      if (currentUserId) {
-        console.log("Request from user:", currentUserId);
-      }
-    }
-
-    console.log("Fetching questions from KV store...");
     let questions = await kvGetByPrefix("question:");
 
-    console.log(`Found ${questions.length} total questions`);
-
-    // 카테고리 필터링 (쿼리 파라미터가 있으면)
     if (categoryFilter) {
-      questions = questions.filter(
-        (q: any) => q.category === categoryFilter,
-      );
-      console.log(
-        `Filtered to ${questions.length} questions for category: ${categoryFilter}`,
-      );
+      questions = questions.filter((q: any) => q.category === categoryFilter);
     }
 
-    // 🔒 비공개 질문 필터링
-    questions = questions.filter((q: any) => {
-      // 공개 질문은 모두에게 표시
-      if (!q.is_private) {
-        return true;
-      }
+    const reqUserId = c.req.header("X-User-ID");
 
-      // 비공개 질문은 작성자 또는 관리자만 볼 수 있음
-      if (isAdmin) {
-        return true;
+    // 비공개 질문: 목록에는 포함하되 content 숨김 (title·author만 표시)
+    // private_password 해시는 절대 클라이언트에 반환하지 않음
+    questions = questions.map((q: any) => {
+      const { private_password_hash, ...safeQ } = q;
+      
+      // 관리자이거나 작성자 본인이면 내용 표시
+      const isAuthor = reqUserId && q.author_id === reqUserId;
+      if (q.is_private && !isAdmin && !isAuthor) {
+        return {
+          ...safeQ,
+          content: "",         // 내용 숨김
+          answers: [],         // 답변 숨김
+          _contentHidden: true,
+        };
       }
-
-      if (currentUserId && q.author_id === currentUserId) {
-        return true;
-      }
-
-      // 그 외에는 비공개 질문 숨김
-      return false;
+      return safeQ;
     });
 
-    console.log(`After privacy filter: ${questions.length} questions`);
-
-    // 시간 순으로 정렬 (최신순)
-    questions.sort((a, b) => {
+    questions.sort((a: any, b: any) => {
       const timeA = new Date(a.created_at || 0).getTime();
       const timeB = new Date(b.created_at || 0).getTime();
       return timeB - timeA;
@@ -2310,16 +2193,13 @@ app.post("/make-server-66444bd0/questions", async (c) => {
 
   try {
     const body = await c.req.json();
-    const { author, title, content, category, is_private, author_id } = body;
+    const { author, title, content, category, is_private, author_id, private_password } = body;
 
     if (!author || !title || !content || !category) {
-      return c.json(
-        {
-          error:
-            "author, title, content, and category are required",
-        },
-        400,
-      );
+      return c.json({ error: "author, title, content, and category are required" }, 400);
+    }
+    if (is_private && !private_password) {
+      return c.json({ error: "비공개 문의는 비밀번호가 필요합니다." }, 400);
     }
 
     // 🔒 Rate Limiting: 질문 생성 제한 (1분에 3개)
@@ -2371,7 +2251,17 @@ app.post("/make-server-66444bd0/questions", async (c) => {
       .split("T")[0]
       .replace(/-/g, ".");
 
-    const questionData = {
+    // 비공개 비밀번호 해시 (SHA-256 + pepper)
+    let private_password_hash: string | null = null;
+    if (is_private && private_password) {
+      const pepper = PASSWORD_PEPPER;
+      const encoded = new TextEncoder().encode(private_password + pepper);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+      private_password_hash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    const questionData: any = {
       id: questionId,
       author: sanitizedAuthor,
       title: sanitizedTitle,
@@ -2384,6 +2274,9 @@ app.post("/make-server-66444bd0/questions", async (c) => {
       is_private: is_private || false,
       author_id: author_id || 'anonymous',
     };
+    if (private_password_hash) {
+      questionData.private_password_hash = private_password_hash;
+    }
 
     // kv_store에 저장
     const key = `question:${questionId}`;
@@ -2422,9 +2315,9 @@ app.post(
         );
       }
 
-      // 🔒 Rate Limiting: 답변 생성 제한 (1분에 5개)
+      // 🔒 Rate Limiting: 답변 생성 제한 (1분에 10개)
       const userIdentifier = `answer:${author}:${questionId}`;
-      if (!checkRateLimit(userIdentifier, 5, 60000)) {
+      if (!checkRateLimit(userIdentifier, 10, 60000)) {
         return c.json(
           {
             error:
@@ -2502,6 +2395,48 @@ app.post(
       );
     }
   },
+);
+
+// POST /questions/:questionId/verify-password - 비공개 질문 비밀번호 검증
+app.post(
+  "/make-server-66444bd0/questions/:questionId/verify-password",
+  async (c) => {
+    try {
+      const questionId = c.req.param("questionId");
+      const { password } = await c.req.json();
+
+      if (!password) {
+        return c.json({ error: "비밀번호를 입력해주세요." }, 400);
+      }
+
+      const question = await kvGet(`question:${questionId}`);
+      if (!question) {
+        return c.json({ error: "질문을 찾을 수 없습니다." }, 404);
+      }
+
+      if (!question.is_private || !question.private_password_hash) {
+        return c.json({ error: "비공개 설정이 없는 문의입니다." }, 400);
+      }
+
+      // 입력된 비밀번호 해시
+      const pepper = PASSWORD_PEPPER;
+      const encoded = new TextEncoder().encode(password + pepper);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+      const inputHash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+
+      if (inputHash !== question.private_password_hash) {
+        return c.json({ code: "PASSWORD_MISMATCH", error: "비밀번호가 일치하지 않습니다." }, 401);
+      }
+
+      // 검증 성공: 전체 내용 반환 (비밀번호 해시 제외)
+      const { private_password_hash, ...safeQuestion } = question;
+      return c.json({ success: true, question: safeQuestion });
+    } catch (error: any) {
+      console.error("Password verify error:", error);
+      return c.json({ error: "비밀번호 확인 중 오류가 발생했습니다." }, 500);
+    }
+  }
 );
 
 // DELETE /questions/:questionId - 질문 삭제 (내용만 교체)
@@ -4438,155 +4373,6 @@ function randomString(length: number): string {
   return result;
 }
 
-// ==============================
-// ANY-ID APIs
-// ==============================
-
-// 상태 확인
-app.get("/make-server-66444bd0/anyid/status", async (c) => {
-  return c.json({
-    enabled: isAnyIdEnabled(),
-    message: isAnyIdEnabled()
-      ? "Any-ID 인증이 활성화되었습니다."
-      : "Java Any-ID 중계앱 연결이 필요합니다.",
-  });
-});
-
-// 인증 시작
-app.post("/make-server-66444bd0/anyid/auth/init", async (c) => {
-  if (!isAnyIdEnabled()) {
-    return c.json(getAnyIdNotEnabledResponse(), 503);
-  }
-
-  try {
-    const body: AnyIdAuthRequest = await c.req.json();
-    const { authMethod, returnUrl } = body;
-
-    if (!authMethod) {
-      return c.json({ error: "authMethod is required" }, 400);
-    }
-
-    const state = generateState();
-
-    await kvSet(`anyid:state:${state}`, {
-      authMethod,
-      returnUrl: returnUrl || null,
-      createdAt: new Date().toISOString(),
-    });
-
-    return c.json({
-      success: true,
-      state,
-      launchUrl:
-        `${ANY_ID_BRIDGE_BASE_URL}/login/login.jsp?state=${encodeURIComponent(state)}&authMethod=${encodeURIComponent(authMethod)}`,
-    });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// 인증 콜백
-app.get("/make-server-66444bd0/anyid/auth/callback", async (c) => {
-  if (!isAnyIdEnabled()) {
-    return c.json(getAnyIdNotEnabledResponse(), 503);
-  }
-
-  try {
-    const state = c.req.query("state");
-    const resultToken = c.req.query("resultToken");
-
-    if (!state || !resultToken) {
-      return c.json({ error: "state or resultToken is missing" }, 400);
-    }
-
-    const storedState = await kvGet(`anyid:state:${state}`);
-    if (!storedState) {
-      return c.json({ error: "Invalid or expired state" }, 400);
-    }
-
-    await kvDel(`anyid:state:${state}`);
-
-    const verifyResp = await fetch(
-      `${ANY_ID_BRIDGE_BASE_URL}/bridge/api/verify-result?resultToken=${encodeURIComponent(resultToken)}`,
-      { method: "GET" },
-    );
-
-    if (!verifyResp.ok) {
-      const msg = await verifyResp.text();
-      return c.json({ error: `bridge verify failed: ${msg}` }, 502);
-    }
-
-    const verified: AnyIdBridgeVerifyResponse = await verifyResp.json();
-
-    if (!verified.success || !verified.ci) {
-      return c.json({ error: "verification failed" }, 400);
-    }
-
-    const { userKey, expiresAt } = await upsertVerifiedUser(verified.ci);
-
-    const sessionId = crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    const sessionData: AnyIdSessionData = {
-      sessionId,
-      userKey,
-      verified: true,
-      authMethod: verified.authMethod,
-      authLevel: verified.authLevel,
-      verifiedAt: verified.verifiedAt || now,
-      expiresAt,
-    };
-
-    await kvSet(`anyid:session:${sessionId}`, sessionData);
-
-    return c.json({
-      success: true,
-      sessionId,
-      verified: true,
-      expiresAt,
-    });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// 세션 조회
-app.get("/make-server-66444bd0/anyid/session/:sessionId", async (c) => {
-  if (!isAnyIdEnabled()) {
-    return c.json(getAnyIdNotEnabledResponse(), 503);
-  }
-
-  try {
-    const sessionId = c.req.param("sessionId");
-    const session = await kvGet(`anyid:session:${sessionId}`);
-
-    if (!session) {
-      return c.json({ error: "Session not found" }, 404);
-    }
-
-    return c.json({ session });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-// 로그아웃
-app.delete("/make-server-66444bd0/anyid/session/:sessionId", async (c) => {
-  if (!isAnyIdEnabled()) {
-    return c.json(getAnyIdNotEnabledResponse(), 503);
-  }
-
-  try {
-    const sessionId = c.req.param("sessionId");
-    await kvDel(`anyid:session:${sessionId}`);
-
-    return c.json({ success: true });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-Deno.serve(app.fetch);
 
 // ========================================
 // 안내 배너 관리 API
@@ -4692,6 +4478,185 @@ app.post("/make-server-66444bd0/banner-content", async (c) => {
       { error: "배너 내용 저장 중 오류가 발생했습니다." },
       500,
     );
+  }
+});
+
+// ============================================================
+// SMS 인증 (알리고 Aligo) 엔드포인트
+// ============================================================
+
+// 알리고 설정 현황 조회 (마스킹된 값만 반환)
+app.get("/make-server-66444bd0/sms-auth/config", async (c) => {
+  try {
+    const config = await kvGet("sms_aligo_config");
+    if (!config) {
+      return c.json({ isConfigured: false, apiKeyMasked: "", userId: "", sender: "" });
+    }
+    return c.json({
+      isConfigured: true,
+      apiKeyMasked: (config.apiKey || "").slice(-4),
+      userId: config.userId || "",
+      sender: config.sender || "",
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// 알리고 설정 저장 (관리자 전용)
+app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
+  try {
+    // 🔒 관리자 세션 토큰 검증 (requireAdminAuth 사용)
+    const authResult = await requireAdminAuth(c);
+    if (!authResult.ok) return authResult.response;
+    const adminId = authResult.adminSession.adminId;
+
+    const { apiKey, userId, sender } = await c.req.json();
+    if (!apiKey || !userId || !sender) {
+      return c.json({ error: "apiKey, userId, sender 모두 필요합니다." }, 400);
+    }
+    if (!/^01[016789]\d{7,8}$/.test(sender.replace(/-/g, ""))) {
+      return c.json({ error: "올바른 발신번호 형식이 아닙니다." }, 400);
+    }
+
+    await kvSet("sms_aligo_config", {
+      apiKey: sanitizeHtml(apiKey.trim()),
+      userId: sanitizeHtml(userId.trim()),
+      sender: sender.replace(/-/g, "").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: adminId,
+    });
+
+    return c.json({
+      success: true,
+      config: {
+        isConfigured: true,
+        apiKeyMasked: apiKey.trim().slice(-4),
+        userId: userId.trim(),
+        sender: sender.replace(/-/g, "").trim(),
+      },
+    });
+  } catch (error: any) {
+    console.error("SMS config save error:", error);
+    return c.json({ error: "설정 저장 중 오류가 발생했습니다." }, 500);
+  }
+});
+
+// OTP 생성 유틸
+function generateOtp(): string {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(arr[0] % 1000000).padStart(6, "0");
+}
+
+// SMS 발송 (알리고 API 호출)
+async function sendAligoSms(to: string, message: string, config: any): Promise<void> {
+  const params = new URLSearchParams({
+    key: config.apiKey,
+    user_id: config.userId,
+    sender: config.sender,
+    receiver: to,
+    msg: message,
+    msg_type: "SMS",
+  });
+  const res = await fetch("https://apis.aligo.in/send/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = await res.json();
+  if (data.result_code !== "1") {
+    throw new Error(`알리고 발송 실패: ${data.message || JSON.stringify(data)}`);
+  }
+}
+
+// OTP 발송 요청
+app.post("/make-server-66444bd0/sms-auth/send", async (c) => {
+  try {
+    const { phone } = await c.req.json();
+    if (!phone || !/^01[016789]\d{7,8}$/.test(phone)) {
+      return c.json({ error: "올바른 휴대폰 번호를 입력해주세요." }, 400);
+    }
+
+    // Rate limit: 같은 번호로 1분에 3회 이상 불가
+    if (!checkRateLimit(`sms_otp:${phone}`, 3, 60000)) {
+      return c.json({ error: "잠시 후 다시 시도해주세요. (1분에 최대 3회)" }, 429);
+    }
+
+    // 알리고 설정 확인
+    const config = await kvGet("sms_aligo_config");
+    if (!config?.apiKey) {
+      return c.json({ code: "SMS_NOT_CONFIGURED", error: "SMS 서비스 설정이 필요합니다." }, 503);
+    }
+
+    const otp = generateOtp();
+    const expireAt = Date.now() + 3 * 60 * 1000; // 3분
+
+    // OTP를 서버에 저장 (전화번호별, 3분 후 자동 만료)
+    await kvSet(`sms_otp:${phone}`, { otp, expireAt, createdAt: new Date().toISOString() });
+
+    // 알리고로 SMS 발송
+    await sendAligoSms(phone, `[성남시 개발 톡톡] 인증번호: ${otp} (3분 이내 입력)`, config);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error("SMS send error:", error);
+    return c.json({ error: error.message || "SMS 발송 중 오류가 발생했습니다." }, 500);
+  }
+});
+
+// OTP 검증
+app.post("/make-server-66444bd0/sms-auth/verify", async (c) => {
+  try {
+    const { phone, otp } = await c.req.json();
+    if (!phone || !otp) {
+      return c.json({ error: "phone과 otp가 필요합니다." }, 400);
+    }
+
+    const stored = await kvGet(`sms_otp:${phone}`);
+    if (!stored) {
+      return c.json({ code: "OTP_EXPIRED", error: "인증번호가 만료되었습니다. 다시 발송해주세요." }, 401);
+    }
+    if (Date.now() > stored.expireAt) {
+      await kvDel(`sms_otp:${phone}`);
+      return c.json({ code: "OTP_EXPIRED", error: "인증번호가 만료되었습니다. 다시 발송해주세요." }, 401);
+    }
+    if (stored.otp !== otp) {
+      return c.json({ code: "OTP_MISMATCH", error: "인증번호가 일치하지 않습니다." }, 401);
+    }
+
+    // 검증 성공 → OTP 삭제
+    await kvDel(`sms_otp:${phone}`);
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error("OTP verify error:", error);
+    return c.json({ error: "인증 확인 중 오류가 발생했습니다." }, 500);
+  }
+});
+
+// 테스트 SMS 발송 (관리자 전용)
+app.post("/make-server-66444bd0/sms-auth/test", async (c) => {
+  try {
+    // 🔒 관리자 세션 토큰 검증 (requireAdminAuth 사용)
+    const authResult = await requireAdminAuth(c);
+    if (!authResult.ok) return authResult.response;
+
+    const { phone } = await c.req.json();
+    if (!phone || !/^01[016789]\d{7,8}$/.test(phone)) {
+      return c.json({ error: "올바른 휴대폰 번호를 입력해주세요." }, 400);
+    }
+
+    const config = await kvGet("sms_aligo_config");
+    if (!config?.apiKey) {
+      return c.json({ code: "SMS_NOT_CONFIGURED", error: "알리고 API Key가 설정되지 않았습니다." }, 503);
+    }
+
+    const testOtp = generateOtp();
+    await sendAligoSms(phone, `[성남시 개발 톡톡] 테스트 인증번호: ${testOtp}`, config);
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error("SMS test error:", error);
+    return c.json({ error: error.message || "테스트 발송 중 오류가 발생했습니다." }, 500);
   }
 });
 
