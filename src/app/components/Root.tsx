@@ -1,14 +1,13 @@
 import { Outlet, Link, useLocation } from "react-router";
-import { Home, LayoutDashboard, Users, Newspaper, BookOpen, Menu, X, Settings, User, LogOut, MapPin, Phone, TrendingUp, UserCog, CalendarDays, DollarSign, BarChart3, School, Bus, FileText, Rss, ChevronDown, ChevronRight, Building2, Image, Info, Car, Layers, LineChart, Shield, Bell } from "lucide-react";
+import { Home, LayoutDashboard, Users, Newspaper, BookOpen, Menu, X, Settings, User, LogOut, MapPin, Phone, TrendingUp, UserCog, CalendarDays, DollarSign, BarChart3, School, Bus, FileText, Rss, ChevronDown, ChevronRight, Building2, Image, Info, Car, Layers, LineChart, Shield, Bell, MessageSquare } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import seongnamLogo from "figma:asset/seongnam-logo.png";
+import seongnamLogo from "../../assets/seongnam-logo.png";
 import { useUser } from "../contexts/UserContext";
-import { useAnyId } from "../contexts/AnyIdContext";
+import { useSmsAuth } from "../contexts/SmsAuthContext";
+import { SmsAuthDialog } from "./SmsAuthDialog";
 import { SkipNav } from "./SkipNav";
 import { SessionTimeoutWarning } from "./SessionTimeoutWarning";
 import { AnalyticsWrapper } from "./AnalyticsWrapper";
-import { AnyIdWelcomeDialog } from "./AnyIdWelcomeDialog";
-import { AnyIdAuthDialog } from "./AnyIdAuthDialog";
 import { clearCsrfToken } from "../utils/csrf";
 
 export function Root() {
@@ -24,8 +23,8 @@ export function Root() {
   const settingsMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { user, logout, isLoggedIn } = useUser();
-  const { isAuthenticated: anyIdAuthenticated } = useAnyId();
-  const [anyIdDialogOpen, setAnyIdDialogOpen] = useState(false);
+  const { isAuthenticated: smsAuthenticated } = useSmsAuth();
+  const [smsAuthDialogOpen, setSmsAuthDialogOpen] = useState(false);
 
   const canManageLogin =
     user?.isPrimaryAdmin === true;
@@ -173,6 +172,7 @@ export function Root() {
     { path: "/guide-management", icon: BookOpen, label: "가이드 관리" },
     { path: "/banner-management", icon: Bell, label: "안내 배너 관리" },
     { path: "/analytics-management", icon: LineChart, label: "통계" },
+    { path: "/settings", icon: MessageSquare, label: "📱 SMS 인증 설정" },
   ];
 
   const settingsCategories = [
@@ -389,12 +389,12 @@ export function Root() {
                 </div>
               ) : (
                 <div className="ml-3 flex items-center gap-2">
-                  {/* Any-ID 시민 인증 버튼 - 미인증 시만 표시 */}
-                  {!anyIdAuthenticated && (
+                  {/* SMS 시민 인증 버튼 - 미인증 시만 표시 */}
+                  {!smsAuthenticated && (
                     <button
-                      onClick={() => setAnyIdDialogOpen(true)}
+                      onClick={() => setSmsAuthDialogOpen(true)}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
-                      aria-label="Any-ID 시민 인증"
+                      aria-label="SMS 시민 인증"
                     >
                       <Shield className="w-5 h-5" aria-hidden="true" />
                       <span className="text-sm font-medium">시민 인증</span>
@@ -465,18 +465,18 @@ export function Root() {
                 </div>
               )}
 
-              {/* 로그인하지 않은 사용자: Any-ID 인증 버튼만 (미인증 시) */}
-              {!isLoggedIn && !anyIdAuthenticated && (
+              {/* 로그인하지 않은 사용자: SMS 인증 버튼만 (미인증 시) */}
+              {!isLoggedIn && !smsAuthenticated && (
                 <div className="mb-4">
                   <button
                     onClick={() => {
-                      setAnyIdDialogOpen(true);
+                      setSmsAuthDialogOpen(true);
                       setMobileMenuOpen(false);
                     }}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
                   >
                     <Shield className="w-5 h-5" aria-hidden="true" />
-                    <span>시민 인증 (Any-ID)</span>
+                    <span>시민 인증 (SMS)</span>
                   </button>
                 </div>
               )}
@@ -546,7 +546,7 @@ export function Root() {
             <div>
               <h2 className="font-bold text-gray-900 mb-3">공지사항</h2>
               <p className="text-sm text-gray-600">
-                ⚠️ 시민광장톡톡 문의는 Any id 인증 후 가능합니다.
+                ⚠️ 시민광장톡톡 문의는 SMS 인증 후 가능합니다.
                 <br />
                 개인정보는 수집 하지 않습니다.
               </p>
@@ -568,13 +568,10 @@ export function Root() {
         />
       )}
 
-      {/* Any-ID 환영 다이얼로그 (시민 첫 방문 시) */}
-      <AnyIdWelcomeDialog />
-
-      {/* Any-ID 인증 다이얼로그 */}
-      <AnyIdAuthDialog
-        open={anyIdDialogOpen}
-        onOpenChange={setAnyIdDialogOpen}
+      {/* SMS 시민 인증 다이얼로그 */}
+      <SmsAuthDialog
+        open={smsAuthDialogOpen}
+        onOpenChange={setSmsAuthDialogOpen}
       />
     </div>
   );
