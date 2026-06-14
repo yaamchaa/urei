@@ -283,6 +283,15 @@ const validatePhoneNumber = (phone: string): boolean => {
   return phoneRegex.test(phone.replace(/\s/g, ""));
 };
 
+const normalizePhoneNumber = (phone: string): string => {
+  return String(phone || "").replace(/\D/g, "").trim();
+};
+
+const validateAdminPhoneNumber = (phone: string): boolean => {
+  const normalized = normalizePhoneNumber(phone);
+  return /^\d{9,11}$/.test(normalized);
+};
+
 // 텍스트 길이 검증
 const validateTextLength = (
   text: string,
@@ -402,13 +411,12 @@ app.use(
   cors({
     origin: "*",
     allowHeaders: [
-      "Content-Type",
-      "Authorization",
-      "apikey",
-      "x-client-info",
-      "X-User-ID",
-      "X-CSRF-Token",
-      "X-Admin-Id",
+       "Content-Type",
+       "Authorization",
+       "apikey",
+       "x-client-info",
+       "X-User-ID",
+       "X-CSRF-Token",
     ],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -431,8 +439,8 @@ app.use("*", async (c, next) => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods":
         "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers":
-        "Content-Type, Authorization, apikey, x-client-info, X-User-ID, X-CSRF-Token, X-Admin-Id",
+      "Access-Control-Allow-Headers":        
+        "Content-Type, Authorization, apikey, x-client-info, X-CSRF-Token",
       "Access-Control-Max-Age": "600",
       // 보안 헤더 추가
       "X-Content-Type-Options": "nosniff",
@@ -452,7 +460,7 @@ app.use("*", async (c, next) => {
   );
   c.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, apikey, x-client-info, X-User-ID, X-CSRF-Token, X-Admin-Id",
+    "Content-Type, Authorization, apikey, x-client-info, X-CSRF-Token",
   );
   c.header("Access-Control-Max-Age", "600");
 
@@ -2155,7 +2163,7 @@ app.get("/make-server-66444bd0/questions", async (c) => {
     }
 
     const reqUserId = c.req.header("X-User-ID");
-
+    
     // 비공개 질문: 목록에는 포함하되 content 숨김 (title·author만 표시)
     // private_password 해시는 절대 클라이언트에 반환하지 않음
     questions = questions.map((q: any) => {
@@ -2198,7 +2206,7 @@ app.post("/make-server-66444bd0/questions", async (c) => {
     if (!author || !title || !content || !category) {
       return c.json({ error: "author, title, content, and category are required" }, 400);
     }
-    if (is_private && !private_password) {
+    if (is_private && (!private_password || !private_password.trim())) {
       return c.json({ error: "비공개 문의는 비밀번호가 필요합니다." }, 400);
     }
 
@@ -3053,20 +3061,29 @@ app.post("/make-server-66444bd0/admin/register", async (c) => {
   try {
     const body = await c.req.json();
     const { name, department, phone, password, authCode } =
-      body;
+  body;
 
-    if (
-      !name ||
-      !department ||
-      !phone ||
-      !password ||
-      !authCode
-    ) {
-      return c.json(
-        { error: "모든 필드를 입력해주세요." },
-        400,
-      );
-    }
+const normalizedPhone = normalizePhoneNumber(phone);
+
+if (
+  !name ||
+  !department ||
+  !normalizedPhone ||
+  !password ||
+  !authCode
+) {
+  return c.json(
+    { error: "모든 필드를 입력해주세요." },
+    400,
+  );
+}
+
+if (!validateAdminPhoneNumber(normalizedPhone)) {
+  return c.json(
+    { error: "올바른 전화번호 형식이 아닙니다." },
+    400,
+  );
+}
 
     // 🔒 비밀번호 보안 검증
     const passwordValidation = validatePassword(password);
@@ -3093,7 +3110,7 @@ app.post("/make-server-66444bd0/admin/register", async (c) => {
     }
 
     // 전화번호 중복 확인
-    const phoneKey = `admin_phone:${phone}`;
+    const phoneKey = `admin_phone:${normalizedPhone}`;
     const existingAdmin = await kvGet(phoneKey);
 
     if (existingAdmin) {
@@ -3113,7 +3130,7 @@ app.post("/make-server-66444bd0/admin/register", async (c) => {
       id: adminId,
       name,
       department,
-      phone,
+      phone: normalizedPhone,
       passwordHash,
       isPrimaryAdmin: false,
       isActive: true,
@@ -3136,7 +3153,7 @@ app.post("/make-server-66444bd0/admin/register", async (c) => {
     await logAdminActivity(adminId, "ADMIN_REGISTER", {
       name,
       department,
-      phone,
+      phone: normalizedPhone,
       isPrimaryAdmin: false,
       isActive: true,
     });
@@ -3172,19 +3189,27 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
       );
     }
 
-    const normalizedPhone = String(phone).trim();
+    const normalizedPhone = normalizePhoneNumber(phone);
 
-    // 🔒 Rate Limiting: 로그인 시도 제한 (1분에 5회)
-    if (!checkRateLimit(`login:${normalizedPhone}`, 5, 60000)) {
-      console.log("login fail: rate limited", normalizedPhone);
-      return c.json(
-        {
-          error:
-            "너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.",
-        },
-        429,
-      );
-    }
+if (!validateAdminPhoneNumber(normalizedPhone)) {
+  console.log("login fail: invalid admin phone format", normalizedPhone);
+  return c.json(
+    { error: "올바른 전화번호 형식이 아닙니다." },
+    400,
+  );
+}
+
+// 🔒 Rate Limiting: 로그인 시도 제한 (1분에 5회)
+if (!checkRateLimit(`login:${normalizedPhone}`, 5, 60000)) {
+  console.log("login fail: rate limited", normalizedPhone);
+  return c.json(
+    {
+      error:
+        "너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.",
+    },
+    429,
+  );
+}
 
     // 전화번호로 관리자 ID 조회
     const phoneKey = `admin_phone:${normalizedPhone}`;
@@ -3250,29 +3275,81 @@ app.post("/make-server-66444bd0/admin/login", async (c) => {
     }
 
     // 비밀번호 확인
-    const storedHash =
-      normalizedAdminData.passwordHash ||
-      normalizedAdminData.password ||
-      "";
-    const passwordOk = await bcrypt.compare(
-      password + PASSWORD_PEPPER,
-      storedHash,
-    );
+const storedHash =
+  normalizedAdminData.passwordHash ||
+  normalizedAdminData.password ||
+  "";
 
-    console.log("password compare result:", passwordOk);
+if (!storedHash) {
+  await logAdminActivity(adminId, "LOGIN_FAILED", {
+    phone: normalizedPhone,
+    reason: "저장된 비밀번호 해시 없음",
+  });
+  console.log("login fail: stored hash missing");
+  return c.json(
+    { error: "관리자 비밀번호 정보가 올바르지 않습니다." },
+    500,
+  );
+}
 
-    if (!passwordOk) {
-      // 📝 로그인 실패 로그 기록
-      await logAdminActivity(adminId, "LOGIN_FAILED", {
-        phone: normalizedPhone,
-        reason: "잘못된 비밀번호",
-      });
-      console.log("login fail: wrong password");
-      return c.json(
-        { error: "비밀번호가 일치하지 않습니다." },
-        401,
-      );
+let passwordOk = false;
+let matchedWithoutPepper = false;
+
+try {
+  // 1차: 현재 방식 (password + pepper)
+  passwordOk = await bcrypt.compare(
+    password + PASSWORD_PEPPER,
+    storedHash,
+  );
+
+  // 2차: 레거시 호환 (pepper 없이 저장된 계정 대응)
+  if (!passwordOk) {
+    passwordOk = await bcrypt.compare(password, storedHash);
+    if (passwordOk) {
+      matchedWithoutPepper = true;
     }
+  }
+} catch (compareError: any) {
+  console.error("bcrypt compare error:", compareError);
+  return c.json(
+    { error: "비밀번호 검증 중 오류가 발생했습니다." },
+    500,
+  );
+}
+
+console.log("password compare result:", passwordOk, {
+  matchedWithoutPepper,
+});
+
+if (!passwordOk) {
+  // 📝 로그인 실패 로그 기록
+  await logAdminActivity(adminId, "LOGIN_FAILED", {
+    phone: normalizedPhone,
+    reason: "잘못된 비밀번호",
+  });
+  console.log("login fail: wrong password");
+  return c.json(
+    { error: "비밀번호가 일치하지 않습니다." },
+    401,
+  );
+}
+
+// 레거시 해시(pepper 없이 저장된 비밀번호)면 현재 방식으로 자동 재해시
+if (matchedWithoutPepper) {
+  const upgradedHash = await bcrypt.hash(
+    password + PASSWORD_PEPPER,
+    12,
+  );
+
+  normalizedAdminData = {
+    ...normalizedAdminData,
+    passwordHash: upgradedHash,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await kvSet(adminKey, normalizedAdminData);
+  console.log("✅ 레거시 비밀번호 해시 업그레이드 완료:", adminId);
+}
 
     console.log("✅ 관리자 로그인 성공:", adminId);
 
@@ -3364,22 +3441,29 @@ app.put("/make-server-66444bd0/admin/profile", async (c) => {
       );
     }
 
-    const trimmedPhone =
-      typeof phone === "string"
-        ? phone.trim()
-        : existingAdmin.phone || "";
-    const trimmedPassword =
-      typeof password === "string" ? password.trim() : "";
+    const normalizedPhone =
+  typeof phone === "string"
+    ? normalizePhoneNumber(phone)
+    : normalizePhoneNumber(existingAdmin.phone || "");
+const trimmedPassword =
+  typeof password === "string" ? password.trim() : "";
 
-    if (!trimmedPhone) {
-      return c.json({ error: "전화번호를 입력해주세요." }, 400);
-    }
+if (!normalizedPhone) {
+  return c.json({ error: "전화번호를 입력해주세요." }, 400);
+}
 
-    const oldPhone = existingAdmin.phone || "";
+if (!validateAdminPhoneNumber(normalizedPhone)) {
+  return c.json(
+    { error: "올바른 전화번호 형식이 아닙니다." },
+    400,
+  );
+}
 
-    if (oldPhone !== trimmedPhone) {
-      const newPhoneKey = `admin_phone:${trimmedPhone}`;
-      const phoneOwner = await kvGet(newPhoneKey);
+const oldPhone = normalizePhoneNumber(existingAdmin.phone || "");
+
+if (oldPhone !== normalizedPhone) {
+  const newPhoneKey = `admin_phone:${normalizedPhone}`;
+  const phoneOwner = await kvGet(newPhoneKey);
 
       if (phoneOwner && phoneOwner !== adminId) {
         return c.json(
@@ -3391,7 +3475,7 @@ app.put("/make-server-66444bd0/admin/profile", async (c) => {
 
     const updatedAdmin = {
       ...existingAdmin,
-      phone: trimmedPhone,
+      phone: normalizedPhone,
       ...(trimmedPassword
         ? {
             passwordHash: await bcrypt.hash(
@@ -3408,10 +3492,10 @@ app.put("/make-server-66444bd0/admin/profile", async (c) => {
 
     await kvSet(adminKey, updatedAdmin);
 
-    if (oldPhone && oldPhone !== trimmedPhone) {
-      await kvDel(`admin_phone:${oldPhone}`);
-      await kvSet(`admin_phone:${trimmedPhone}`, adminId);
-    }
+    if (oldPhone && oldPhone !== normalizedPhone) {
+  await kvDel(`admin_phone:${oldPhone}`);
+  await kvSet(`admin_phone:${normalizedPhone}`, adminId);
+}
 
     await logAdminActivity(adminId, "PROFILE_UPDATED", {
       before: {
@@ -3427,7 +3511,7 @@ app.put("/make-server-66444bd0/admin/profile", async (c) => {
         isPrimaryAdmin: updatedAdmin.isPrimaryAdmin,
       },
       changedFields: {
-        phone: oldPhone !== trimmedPhone,
+        phone: oldPhone !== normalizedPhone,
         password: !!trimmedPassword,
       },
     });
@@ -4506,15 +4590,16 @@ app.get("/make-server-66444bd0/sms-auth/config", async (c) => {
 // 알리고 설정 저장 (관리자 전용)
 app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
   try {
-    // 🔒 관리자 세션 토큰 검증 (requireAdminAuth 사용)
-    const authResult = await requireAdminAuth(c);
-    if (!authResult.ok) return authResult.response;
-    const adminId = authResult.adminSession.adminId;
+    const auth = await requireAdminAuth(c, true);
+    if (!auth.ok) return auth.response;
+    const adminId = auth.adminSession.adminId;
 
     const { apiKey, userId, sender } = await c.req.json();
+
     if (!apiKey || !userId || !sender) {
       return c.json({ error: "apiKey, userId, sender 모두 필요합니다." }, 400);
     }
+
     if (!/^01[016789]\d{7,8}$/.test(sender.replace(/-/g, ""))) {
       return c.json({ error: "올바른 발신번호 형식이 아닙니다." }, 400);
     }
@@ -4525,6 +4610,11 @@ app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
       sender: sender.replace(/-/g, "").trim(),
       updatedAt: new Date().toISOString(),
       updatedBy: adminId,
+    });
+
+    await logAdminActivity(adminId, "sms_config_updated", {
+      userId: sanitizeHtml(userId.trim()),
+      sender: sender.replace(/-/g, "").trim(),
     });
 
     return c.json({
@@ -4637,11 +4727,12 @@ app.post("/make-server-66444bd0/sms-auth/verify", async (c) => {
 // 테스트 SMS 발송 (관리자 전용)
 app.post("/make-server-66444bd0/sms-auth/test", async (c) => {
   try {
-    // 🔒 관리자 세션 토큰 검증 (requireAdminAuth 사용)
-    const authResult = await requireAdminAuth(c);
-    if (!authResult.ok) return authResult.response;
+    const auth = await requireAdminAuth(c, true);
+    if (!auth.ok) return auth.response;
+    const adminId = auth.adminSession.adminId;
 
     const { phone } = await c.req.json();
+
     if (!phone || !/^01[016789]\d{7,8}$/.test(phone)) {
       return c.json({ error: "올바른 휴대폰 번호를 입력해주세요." }, 400);
     }
@@ -4653,6 +4744,11 @@ app.post("/make-server-66444bd0/sms-auth/test", async (c) => {
 
     const testOtp = generateOtp();
     await sendAligoSms(phone, `[성남시 개발 톡톡] 테스트 인증번호: ${testOtp}`, config);
+
+    await logAdminActivity(adminId, "sms_test_sent", {
+      targetPhone: phone,
+    });
+
     return c.json({ success: true });
   } catch (error: any) {
     console.error("SMS test error:", error);
