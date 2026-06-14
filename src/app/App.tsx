@@ -6,7 +6,7 @@ import { UserProvider } from "./contexts/UserContext";
 import { ProgressProvider } from "./contexts/ProgressContext";
 import { TimelineProvider } from "./contexts/TimelineContext";
 import { ContributionProvider } from "./contexts/ContributionContext";
-import { AnyIdProvider } from "./contexts/AnyIdContext";
+import { SmsAuthProvider } from "./contexts/SmsAuthContext";
 import { HelmetProvider } from "react-helmet-async";
 import { AriaLiveRegion } from "./components/AriaLiveRegion";
 import "./utils/suppressRadixWarnings";
@@ -14,7 +14,7 @@ import "./utils/suppressRadixWarnings";
 export default function App() {
   return (
     <HelmetProvider>
-      <AnyIdProvider>
+      <SmsAuthProvider>
         <UserProvider>
           <ProgressProvider>
             <ContributionProvider>
@@ -28,7 +28,7 @@ export default function App() {
             </ContributionProvider>
           </ProgressProvider>
         </UserProvider>
-      </AnyIdProvider>
+      </SmsAuthProvider>
     </HelmetProvider>
   );
 }
