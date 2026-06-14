@@ -1257,7 +1257,7 @@ export function GuidelinePage() {
               <CardContent className="py-6">
                 <h3 className="font-semibold text-blue-900 mb-2">더 궁금하신가요?</h3>
                 <p className="text-sm text-blue-800 mb-4">
-                  시민광장에 질문을 남기시면 재개발, 재건축 지원 센터에서 답변해드립니다.
+                  시민광장에서 질문을 남기시면 재개발, 재건축 지원 센터에서 답변해드립니다.
                 </p>
                 <Link to="/community" aria-label="시민광장으로 이동">
                 <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-100">
