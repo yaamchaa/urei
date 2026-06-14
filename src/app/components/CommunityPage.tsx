@@ -15,10 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "./ui/switch";
 import { projectId, publicAnonKey } from "../../../utils/supabase/info.tsx";
 import { useUser } from "../contexts/UserContext";
-import { useAnyId } from "../contexts/AnyIdContext";
+import { useSmsAuth } from "../contexts/SmsAuthContext";
 import { trackEvent, trackClarityEvent } from "./Analytics";
 import { useComplexList } from "../hooks/useComplexList";
 import { getCategoryName } from "../data/complexes";
+import { getAdminApiToken } from "../adminApi";
 
 interface QuestionAnswer {
   id: number;
@@ -40,6 +41,7 @@ interface Question {
   created_at?: string;
   is_private?: boolean;
   author_id?: string;
+  _contentHidden?: boolean;
 }
 
 interface Answer {
@@ -125,11 +127,8 @@ const checkBannedWords = (text: string): boolean => {
 export function CommunityPage() {
   const location = useLocation();
   const { user, isLoggedIn, setUser } = useUser();
-  const { isAuthenticated: anyIdAuthenticated, user: anyIdUser } = useAnyId();
-  const realName =
-  anyIdUser?.name?.trim() ||
-  user?.name?.trim() ||
-  "이름없음";
+  const { isAuthenticated: smsAuthenticated } = useSmsAuth();
+  const realName = user?.name?.trim() || "이름없음";
   
   // URL 경로에서 카테고리 추출
   const getCategoryFromPath = () => {
@@ -164,7 +163,7 @@ export function CommunityPage() {
   const [votingPoll, setVotingPoll] = useState<string | null>(null);
   const [userVotes, setUserVotes] = useState<{[pollId: string]: number}>({});  // 사용자가 투표한 선택지 기록
 
-  const [newQuestion, setNewQuestion] = useState({ title: "", content: "", category: "재건축", isPrivate: false });
+  const [newQuestion, setNewQuestion] = useState({ title: "", author: "", content: "", category: "재건축", isPrivate: false, password: "" });
   
   // 카테고리별 첫 번째 단지를 기본 선택값으로 설정
   const [selectedComplex, setSelectedComplex] = useState("");
@@ -301,10 +300,13 @@ export function CommunityPage() {
   const loadQuestions = async () => {
     try {
       // 사용자 ID 가져오기 (비공개 질문 필터링용)
-      const userId = anyIdUser?.userId || user?.memberId;
+      const userId = user?.memberId;
 
+      // 관리자 토큰 확인
+      const adminToken = getAdminApiToken();
+      
       const headers: HeadersInit = {
-        Authorization: `Bearer ${publicAnonKey}`,
+        Authorization: `Bearer ${user?.role === "admin" && adminToken ? adminToken : publicAnonKey}`,
       };
 
       // 사용자 ID가 있으면 헤더에 추가
@@ -362,10 +364,12 @@ export function CommunityPage() {
         endpoint = `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/messages/${deleteTarget.complexId}/${deleteTarget.messageId}/replies/${deleteTarget.replyId}`;
       }
 
+      const adminToken = getAdminApiToken();
+
       const response = await fetch(endpoint, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${publicAnonKey}`,
+          Authorization: `Bearer ${user?.role === "admin" && adminToken ? adminToken : publicAnonKey}`,
         },
       });
 
@@ -405,7 +409,7 @@ export function CommunityPage() {
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchType, setSearchType] = useState<"title_content" | "title" | "content">("title_content");
+  const [searchType, setSearchType] = useState<"title_content" | "title" | "content" | "author">("title_content");
 
   // 댓글 관련 상태
   const [expandedMessageId, setExpandedMessageId] = useState<number | null>(null);
@@ -414,6 +418,46 @@ export function CommunityPage() {
   // Q&A 답변 관련 상태
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
   const [answerContent, setAnswerContent] = useState("");
+
+  // 비공개 질문 비밀번호 팝업 상태
+  const [privatePasswordDialog, setPrivatePasswordDialog] = useState<{ questionId: number | null; input: string; error: string; loading: boolean }>({ questionId: null, input: "", error: "", loading: false });
+  // 비밀번호 인증 완료된 질문 ID → 서버에서 받은 전체 내용 저장
+  const [unlockedQuestions, setUnlockedQuestions] = useState<{ [id: number]: { content: string; answers: any[] } }>({});
+
+  // 비공개 문의 비밀번호 서버 검증
+  const verifyPrivatePassword = async () => {
+    if (!privatePasswordDialog.questionId || !privatePasswordDialog.input.trim()) return;
+    setPrivatePasswordDialog(prev => ({ ...prev, loading: true, error: "" }));
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions/${privatePasswordDialog.questionId}/verify-password`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${publicAnonKey}` },
+          body: JSON.stringify({ password: privatePasswordDialog.input }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.success) {
+        // 서버에서 받은 전체 내용을 로컬에 저장
+        setUnlockedQuestions(prev => ({
+          ...prev,
+          [privatePasswordDialog.questionId!]: {
+            content: data.question.content,
+            answers: data.question.answers || [],
+          },
+        }));
+        setExpandedQuestionId(privatePasswordDialog.questionId);
+        setPrivatePasswordDialog({ questionId: null, input: "", error: "", loading: false });
+      } else if (data.code === "OTP_EXPIRED" || data.code === "PASSWORD_MISMATCH") {
+        setPrivatePasswordDialog(prev => ({ ...prev, loading: false, error: "비밀번호가 일치하지 않습니다." }));
+      } else {
+        setPrivatePasswordDialog(prev => ({ ...prev, loading: false, error: data.error || "확인 중 오류가 발생했습니다." }));
+      }
+    } catch {
+      setPrivatePasswordDialog(prev => ({ ...prev, loading: false, error: "서버 연결에 실패했습니다." }));
+    }
+  };
 
   const handleComplexClick = (complexId: string) => {
     // 단지 선택 시 메시지 표시 개수 초기화
@@ -452,9 +496,9 @@ export function CommunityPage() {
   }, [selectedComplex]);
 
   const handleSendMessage = async () => {
-    // Any-ID 인증 체크
-    if (!anyIdAuthenticated && !isLoggedIn) {
-      alert("🔐 메시지 작성은 Any-ID 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
+    // SMS 인증 체크
+    if (!smsAuthenticated && !isLoggedIn) {
+      alert("🔐 메시지 작성은 SMS 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
       return;
     }
 
@@ -508,9 +552,9 @@ export function CommunityPage() {
 
   // 댓글 전송 함수
   const handleSendReply = async (messageId: number) => {
-    // Any-ID 인증 체크
-    if (!anyIdAuthenticated && !isLoggedIn) {
-      alert("🔐 댓글 작성은 Any-ID 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
+    // SMS 인증 체크
+    if (!smsAuthenticated && !isLoggedIn) {
+      alert("🔐 댓글 작성은 SMS 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
       return;
     }
 
@@ -563,14 +607,24 @@ export function CommunityPage() {
   };
 
   const handleSubmitQuestion = async () => {
-    // Any-ID 인증 체크
-    if (!anyIdAuthenticated && !isLoggedIn) {
-      alert("🔐 질문 작성은 Any-ID 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
+    // SMS 인증 체크
+    if (!smsAuthenticated && !isLoggedIn) {
+      alert("🔐 질문 작성은 SMS 시민 인증이 필요합니다.\n\n우측 상단의 '시민 인증' 버튼을 클릭하여 본인 인증을 진행해주세요.");
+      return;
+    }
+
+    if (!newQuestion.author.trim()) {
+      alert("작성자명을 입력 후 질문을 할 수 있습니다.");
       return;
     }
 
     if (!newQuestion.title.trim() || !newQuestion.content.trim()) {
       alert("제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+
+    if (newQuestion.isPrivate && !newQuestion.password.trim()) {
+      alert("비공개 문의는 비밀번호를 입력해야 합니다.");
       return;
     }
 
@@ -581,8 +635,8 @@ export function CommunityPage() {
     }
 
     try {
-      // 사용자 ID 가져오기 (Any-ID 또는 일반 사용자)
-      const authorId = anyIdUser?.userId || user?.memberId || 'anonymous';
+      // 사용자 ID 가져오기
+      const authorId = user?.memberId || 'anonymous';
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions`,
@@ -593,11 +647,12 @@ export function CommunityPage() {
             Authorization: `Bearer ${publicAnonKey}`,
           },
           body: JSON.stringify({
-            author: realName,
+            author: newQuestion.author.trim(),
             title: newQuestion.title.trim(),
             content: newQuestion.content.trim(),
-            category: category, // 현재 페이지의 카테고리 사용
+            category: category,
             is_private: newQuestion.isPrivate,
+            private_password: newQuestion.isPrivate ? newQuestion.password.trim() : null,
             author_id: authorId
           })
         }
@@ -616,9 +671,11 @@ export function CommunityPage() {
         // 질문 폼 초기화
         setNewQuestion({
           title: "",
+          author: "",
           content: "",
           category: "재건축",
           isPrivate: false,
+          password: "",
         });
 
         await loadQuestions(); // 질문 다시 로드
@@ -655,13 +712,15 @@ export function CommunityPage() {
     try {
       const authorName = realName;
       
+      const adminToken = getAdminApiToken();
+      
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-66444bd0/questions/${questionId}/answers`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${user?.role === "admin" && adminToken ? adminToken : publicAnonKey}`,
           },
           body: JSON.stringify({
             author: authorName,
@@ -740,6 +799,7 @@ export function CommunityPage() {
             </CardHeader>
               
               <CardContent className="space-y-4">
+                {/* 제목 + 공개/비공개 스위치 */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-gray-700">
@@ -749,7 +809,7 @@ export function CommunityPage() {
                       <span className={`text-sm ${newQuestion.isPrivate ? 'text-gray-500' : 'font-semibold text-blue-600'}`}>공개</span>
                       <Switch
                         checked={newQuestion.isPrivate}
-                        onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, isPrivate: checked })}
+                        onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, isPrivate: checked, password: "" })}
                       />
                       <span className={`text-sm ${newQuestion.isPrivate ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>비공개</span>
                     </div>
@@ -761,6 +821,34 @@ export function CommunityPage() {
                     maxLength={50}
                   />
                 </div>
+                {/* 작성자 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    작성자 <span className="text-red-500 text-xs">*필수 (작성자명이 정확하지 않으면 관리자에 의해 삭제 될 수 있습니다.)</span>
+                  </label>
+                  <Input
+                    placeholder="작성자명을 입력하세요"
+                    value={newQuestion.author}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, author: e.target.value })}
+                    maxLength={20}
+                  />
+                </div>
+                {/* 비공개 비밀번호 */}
+                {newQuestion.isPrivate && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      비밀번호 <span className="text-red-500 text-xs">*비공개 필수 (비밀번호는 관리되지 않으니 필히 기억 하시기 바랍니다.)</span>
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="비밀번호를 설정하세요 (내용 확인 시 사용)"
+                      value={newQuestion.password}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, password: e.target.value })}
+                      maxLength={20}
+                    />
+                  </div>
+                )}
+                {/* 내용 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     내용 <span className="text-xs text-gray-500">({newQuestion.content.length}/500자)</span>
@@ -796,6 +884,7 @@ export function CommunityPage() {
                         <SelectItem value="title_content">제목+내용</SelectItem>
                         <SelectItem value="title">제목</SelectItem>
                         <SelectItem value="content">내용</SelectItem>
+                        <SelectItem value="author">작성자</SelectItem>
                       </SelectContent>
                     </Select>
                     <div className="relative flex-1">
@@ -805,7 +894,8 @@ export function CommunityPage() {
                         placeholder={
                           searchType === "title_content" ? "제목+내용 검색 (2글자 이상)" :
                           searchType === "title" ? "제목으로 검색 (2글자 이상)" :
-                          "내용으로 검색 (2글자 이상)"
+                          searchType === "content" ? "내용으로 검색 (2글자 이상)" :
+                          "작성자명으로 검색 (2글자 이상)"
                         }
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -820,6 +910,7 @@ export function CommunityPage() {
                         const kw = searchQuery.toLowerCase();
                         if (searchType === "title") return q.title.toLowerCase().includes(kw);
                         if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                        if (searchType === "author") return q.author.toLowerCase().includes(kw);
                         return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
                       }).length
                     : questions.length}개 문의
@@ -833,21 +924,37 @@ export function CommunityPage() {
                       const kw = searchQuery.toLowerCase();
                       if (searchType === "title") return q.title.toLowerCase().includes(kw);
                       if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                      if (searchType === "author") return q.author.toLowerCase().includes(kw);
                       return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
                     })
                   : questions;
 
+                // 일련번호: questions 배열 전체 기준 (최신=맨위 → 가장 큰 번호)
+                const totalCount = questions.length;
+
                 return filteredQuestions.slice(0, visibleQuestionsCount).map((q) => {
+                  const serialNo = totalCount - questions.indexOf(q);
+                  const unlockedData = unlockedQuestions[q.id];
+                  const isUnlocked = !!unlockedData;
+                  const isPrivateHidden = q.is_private && !isUnlocked && user?.role !== "admin";
+
                 return (
                 <Card key={q.id} className="bg-gray-50">
                   {/* 질문 본문 */}
                   <div
                     className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id)}
+                    onClick={() => {
+                      if (isPrivateHidden) {
+                        setPrivatePasswordDialog({ questionId: q.id, input: "", error: "" });
+                      } else {
+                        setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id);
+                      }
+                    }}
                   >
                     <div className="flex gap-3">
-                      <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
-                        {q.author.charAt(0)}
+                      {/* 일련번호 배지 */}
+                      <div className="min-w-[2.5rem] h-8 bg-purple-600 rounded-full px-2 flex items-center justify-center text-white font-semibold flex-shrink-0 text-sm whitespace-nowrap">
+                         {serialNo}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -867,27 +974,35 @@ export function CommunityPage() {
                             </Badge>
                           )}
                         </div>
-                        <h4 className={`font-semibold mb-1 break-all line-clamp-3 ${(q as any).censored ? 'text-gray-600 Notosans-kr' : 'text-gray-900'}`}>
+                        <h4 className={`font-semibold mb-1 break-all line-clamp-3 ${(q as any).censored ? 'text-gray-600' : 'text-gray-900'}`}>
                           {q.title}
                         </h4>
-                        <p className={`text-sm mb-2 break-all line-clamp-3 ${(q as any).censored ? 'text-gray-600 Notosans-kr' : 'text-gray-700'}`}>
-                          {q.content}
-                        </p>
+                        {isPrivateHidden ? (
+                          <p className="text-sm text-gray-500 italic mb-2 flex items-center gap-1">
+                            <EyeOff className="w-3 h-3 flex-shrink-0" />
+                            비공개 문의 입니다. 클릭 시 비밀번호 입력 후 내용을 확인할 수 있습니다.
+                          </p>
+                        ) : (
+                          <p className={`text-sm mb-2 break-all line-clamp-3 ${(q as any).censored ? 'text-gray-600' : 'text-gray-700'}`}>
+                            {isUnlocked ? unlockedData.content : q.content}
+                          </p>
+                        )}
                         <div className="text-xs text-gray-500">
-                          {expandedQuestionId === q.id ? "👆 클릭하여 접기" : "💬 질문 답변하기"}
+                          {isPrivateHidden ? "🔒 비밀번호 입력" : expandedQuestionId === q.id ? "👆 클릭하여 접기" : "💬 질문 답변하기"}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* 답변 영역 (확장 시) */}
-                  {expandedQuestionId === q.id && (
+                  {/* 답변 영역 (확장 시, 비공개는 잠금 해제 후에만) */}
+                  {expandedQuestionId === q.id && !isPrivateHidden && (
                     <div className="border-t border-gray-200 px-4 pb-4">
-                      {/* 기존 답변 목록 */}
-                      {q.answers && q.answers.length > 0 && (
+                      {(() => {
+                        const displayAnswers = isUnlocked ? unlockedData.answers : (q.answers || []);
+                        return displayAnswers && displayAnswers.length > 0 && (
                         <div className="mt-3 space-y-2">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">💬 답변 {q.answers.length}개</p>
-                          {q.answers.map((answer) => (
+                          <p className="text-sm font-semibold text-gray-700 mb-2">💬 답변 {displayAnswers.length}개</p>
+                          {displayAnswers.map((answer: any) => (
                             <div key={answer.id} className="flex gap-2 bg-white p-3 rounded">
                               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                                 {answer.author.charAt(0)}
@@ -912,35 +1027,35 @@ export function CommunityPage() {
                             </div>
                           ))}
                         </div>
-                      )}
+                        );
+                      })()}
 
-                      {/* 답변 입력창 - 관리자만 보임*/}
-                    {user?.role === "admin" && (  
-                      <div className="mt-3">
-                        <label className="block text-xs text-gray-500 mb-1">
-                          답변 ({answerContent.length}/500자)
-                        </label>
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder="답변을 입력하세요..."
-                            value={answerContent}
-                            onChange={(e) => setAnswerContent(e.target.value)}
-                            className="flex-1"
-                            rows={3}
-                            maxLength={500}
-                          />
+                      {user?.role === "admin" && (
+                        <div className="mt-3">
+                          <label className="block text-xs text-gray-500 mb-1">
+                            답변 ({answerContent.length}/500자)
+                          </label>
+                          <div className="flex gap-2">
+                            <Textarea
+                              placeholder="답변을 입력하세요..."
+                              value={answerContent}
+                              onChange={(e) => setAnswerContent(e.target.value)}
+                              className="flex-1"
+                              rows={3}
+                              maxLength={500}
+                            />
+                          </div>
+                          <Button
+                            onClick={() => handleSubmitAnswer(q.id)}
+                            size="sm"
+                            className="mt-2 w-full"
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            답변 등록
+                          </Button>
                         </div>
-                        <Button
-                          onClick={() => handleSubmitAnswer(q.id)}
-                          size="sm"
-                          className="mt-2 w-full"
-                        >
-                          <Send className="w-4 h-4 mr-2" />
-                          답변 등록
-                        </Button>
-                      </div>
-                     )} 
-                    </div>                 
+                      )}
+                    </div>
                   )}
                 </Card>
                 );
@@ -963,7 +1078,13 @@ export function CommunityPage() {
               {/* 더 보기 버튼 */}
               {(() => {
                 const filteredQuestions = searchQuery.length >= 2
-                  ? questions.filter(q => q.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ? questions.filter(q => {
+                      const kw = searchQuery.toLowerCase();
+                      if (searchType === "title") return q.title.toLowerCase().includes(kw);
+                      if (searchType === "content") return q.content.toLowerCase().includes(kw);
+                      if (searchType === "author") return q.author.toLowerCase().includes(kw);
+                      return q.title.toLowerCase().includes(kw) || q.content.toLowerCase().includes(kw);
+                    })
                   : questions;
 
                 return filteredQuestions.length > visibleQuestionsCount && (
@@ -1659,6 +1780,45 @@ export function CommunityPage() {
             >
               <Trash2 className="w-4 h-4 mr-2" />
               삭제 확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 비공개 문의 비밀번호 입력 다이얼로그 */}
+      <Dialog
+        open={privatePasswordDialog.questionId !== null}
+        onOpenChange={(open) => { if (!open) setPrivatePasswordDialog({ questionId: null, input: "", error: "", loading: false }); }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <EyeOff className="w-5 h-5 text-gray-600" />
+              비공개 문의 확인
+            </DialogTitle>
+            <DialogDescription>
+              작성 시 설정한 비밀번호를 입력하면 내용을 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              type="password"
+              placeholder="비밀번호를 입력하세요"
+              value={privatePasswordDialog.input}
+              disabled={privatePasswordDialog.loading}
+              onChange={(e) => setPrivatePasswordDialog(prev => ({ ...prev, input: e.target.value, error: "" }))}
+              onKeyDown={(e) => { if (e.key === "Enter") verifyPrivatePassword(); }}
+            />
+            {privatePasswordDialog.error && (
+              <p className="text-sm text-red-500">{privatePasswordDialog.error}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={privatePasswordDialog.loading} onClick={() => setPrivatePasswordDialog({ questionId: null, input: "", error: "", loading: false })}>
+              취소
+            </Button>
+            <Button onClick={verifyPrivatePassword} disabled={privatePasswordDialog.loading || !privatePasswordDialog.input.trim()}>
+              {privatePasswordDialog.loading ? "확인 중..." : "확인"}
             </Button>
           </DialogFooter>
         </DialogContent>
