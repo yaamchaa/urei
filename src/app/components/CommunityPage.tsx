@@ -666,15 +666,27 @@ export function CommunityPage() {
     }
 
     if (newQuestion.isPrivate && !newQuestion.password.trim()) {
-      alert("비공개 문의는 비밀번호를 입력해야 합니다.");
-      return;
-    }
+  alert("비공개 문의는 비밀번호를 입력해야 합니다.");
+  return;
+}
 
-    // 금지어 체크
-    if (checkBannedWords(newQuestion.title) || checkBannedWords(newQuestion.content)) {
-      alert("⚠️ 금지어 입력 시 등록이 불가 합니다.");
-      return;
-    }
+if (newQuestion.isPrivate) {
+  const privatePasswordError = validatePrivatePassword(
+    newQuestion.password.trim(),
+  );
+
+  if (privatePasswordError) {
+    setPasswordError(privatePasswordError);
+    alert(privatePasswordError);
+    return;
+  }
+}
+
+// 금지어 체크
+if (checkBannedWords(newQuestion.title) || checkBannedWords(newQuestion.content)) {
+  alert("⚠️ 금지어 입력 시 등록이 불가 합니다.");
+  return;
+}
 
     try {
       // 사용자 ID 가져오기
@@ -719,12 +731,13 @@ export function CommunityPage() {
           isPrivate: false,
           password: "",
         });
-
+        setPasswordError("");
+        
         await loadQuestions(); // 질문 다시 로드
       } else {
         const errorData = await response.json();
         console.error("질문 등록 오류:", errorData);
-        alert("질문 등록에 실패했습니다.");
+        alert(errorData.error || "질문 등록에 실패했습니다.");
       }
     } catch (error) {
       console.error("질문 등록 오류:", error);
@@ -851,7 +864,10 @@ export function CommunityPage() {
                       <span className={`text-sm ${newQuestion.isPrivate ? 'text-gray-500' : 'font-semibold text-blue-600'}`}>공개</span>
                       <Switch
                         checked={newQuestion.isPrivate}
-                        onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, isPrivate: checked, password: "" })}
+                        onCheckedChange={(checked) => {
+                           setNewQuestion({ ...newQuestion, isPrivate: checked, password: "" });
+                           setPasswordError("");
+                         }}
                       />
                       <span className={`text-sm ${newQuestion.isPrivate ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>비공개</span>
                     </div>
