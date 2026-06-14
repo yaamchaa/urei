@@ -304,6 +304,43 @@ const validateTextLength = (
   );
 };
 
+const validatePrivateQuestionPassword = (
+  value: string,
+): string => {
+  if (!value) return "비밀번호를 입력해주세요.";
+  if (!/^\d+$/.test(value)) {
+    return "비밀번호는 숫자만 입력할 수 있습니다.";
+  }
+  if (value.length < 4) {
+    return "비밀번호는 4자리 이상 입력해주세요.";
+  }
+
+  let consecutiveCount = 1;
+  for (let i = 1; i < value.length; i++) {
+    const prev = Number(value[i - 1]);
+    const curr = Number(value[i]);
+
+    if (curr === prev + 1) {
+      consecutiveCount += 1;
+      if (consecutiveCount >= 4) {
+        return "연속된 숫자 4개 이상은 사용할 수 없습니다.";
+      }
+    } else {
+      consecutiveCount = 1;
+    }
+  }
+
+  const digitCount: Record<string, number> = {};
+  for (const ch of value) {
+    digitCount[ch] = (digitCount[ch] || 0) + 1;
+    if (digitCount[ch] >= 3) {
+      return "같은 숫자는 3개 이상 사용할 수 없습니다.";
+    }
+  }
+
+  return "";
+};
+
 // 금지어 검증 (서버 측)
 const BANNED_WORDS = [
   "씨발",
@@ -2207,8 +2244,18 @@ app.post("/make-server-66444bd0/questions", async (c) => {
       return c.json({ error: "author, title, content, and category are required" }, 400);
     }
     if (is_private && (!private_password || !private_password.trim())) {
-      return c.json({ error: "비공개 문의는 비밀번호가 필요합니다." }, 400);
-    }
+  return c.json({ error: "비공개 문의는 비밀번호가 필요합니다." }, 400);
+}
+
+if (is_private) {
+  const privatePasswordError = validatePrivateQuestionPassword(
+    String(private_password || "").trim(),
+  );
+
+  if (privatePasswordError) {
+    return c.json({ error: privatePasswordError }, 400);
+  }
+}
 
     // 🔒 Rate Limiting: 질문 생성 제한 (1분에 3개)
     const userIdentifier = `question:${author}:${category}`;
@@ -2262,12 +2309,18 @@ app.post("/make-server-66444bd0/questions", async (c) => {
     // 비공개 비밀번호 해시 (SHA-256 + pepper)
     let private_password_hash: string | null = null;
     if (is_private && private_password) {
-      const pepper = PASSWORD_PEPPER;
-      const encoded = new TextEncoder().encode(private_password + pepper);
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
-      private_password_hash = Array.from(new Uint8Array(hashBuffer))
-        .map(b => b.toString(16).padStart(2, "0")).join("");
-    }
+  const safePrivatePassword = String(private_password).trim();
+  const pepper = PASSWORD_PEPPER;
+  const encoded = new TextEncoder().encode(
+    safePrivatePassword + pepper,
+  );
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  private_password_hash = Array.from(
+    new Uint8Array(hashBuffer),
+  )
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
     const questionData: any = {
       id: questionId,
