@@ -4,8 +4,8 @@ import { Building2, MapPin, Home, Shield } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { useAnyId } from "../contexts/AnyIdContext";
-import { AnyIdAuthDialog } from "./AnyIdAuthDialog";
+import { useSmsAuth } from "../contexts/SmsAuthContext";
+import { SmsAuthDialog } from "./SmsAuthDialog";
 
 export function CommunitySelectionPage() {
   useEffect(() => {
@@ -14,8 +14,8 @@ export function CommunitySelectionPage() {
     document.body.scrollTop = 0;
   }, []);
 
-  const { isAuthenticated: anyIdAuthenticated } = useAnyId();
-  const [anyIdDialogOpen, setAnyIdDialogOpen] = useState(false);
+  const { isAuthenticated: smsAuthenticated } = useSmsAuth();
+  const [smsAuthDialogOpen, setSmsAuthDialogOpen] = useState(false);
 
   const communityCategories = [
     {
@@ -63,27 +63,27 @@ export function CommunitySelectionPage() {
         <link rel="canonical" href={`${window.location.origin}/community`} />
       </Helmet>
 
-      {!anyIdAuthenticated && (
-        <section className="w-full pt-8 pb-4" aria-labelledby="anyid-banner">
+      {!smsAuthenticated && (
+        <section className="w-full pt-8 pb-4" aria-labelledby="sms-auth-banner">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   <Shield className="w-12 h-12 flex-shrink-0" aria-hidden="true" />
                   <div>
-                    <h2 id="anyid-banner" className="text-xl font-bold mb-2">
-                      🔐 시민 인증 (Any-ID)
+                    <h2 id="sms-auth-banner" className="text-xl font-bold mb-2">
+                      📱 SMS 시민 인증
                     </h2>
                     <p className="text-sm text-green-50 mb-1">
-                      회원가입 없이 본인 인증만으로 서비스를 이용하세요
+                      회원가입 없이 휴대폰 문자 인증만으로 서비스를 이용하세요
                     </p>
                     <p className="text-xs text-green-100">
-                      모바일신분증 · 공동인증서 · 금융인증서 · 간편인증 · 민간ID (네이버, 카카오, 토스)
+                      알리고(Aligo) SMS 인증 · 6자리 인증번호 · 3분 유효 · 개인정보 미수집
                     </p>
                   </div>
                 </div>
                 <Button
-                  onClick={() => setAnyIdDialogOpen(true)}
+                  onClick={() => setSmsAuthDialogOpen(true)}
                   className="bg-white text-green-600 hover:bg-green-50 font-semibold px-8 py-3 text-base whitespace-nowrap"
                 >
                   지금 인증하기
@@ -144,9 +144,9 @@ export function CommunitySelectionPage() {
         </div>
       </div>
 
-      <AnyIdAuthDialog
-        open={anyIdDialogOpen}
-        onOpenChange={setAnyIdDialogOpen}
+      <SmsAuthDialog
+        open={smsAuthDialogOpen}
+        onOpenChange={setSmsAuthDialogOpen}
       />
     </div>
   );
