@@ -202,8 +202,4 @@ export const router = createHashRouter([
     path: "/admin/login",
     Component: AdminLoginPage
   },
-  {
-    path: "/auth/anyid/callback",
-    lazy: () => import("./components/AnyIdCallbackPage").then(m => ({ Component: m.AnyIdCallbackPage }))
-  },
 ]);
