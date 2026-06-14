@@ -459,7 +459,49 @@ export function CommunityPage() {
     }
   };
 
+  // 비공개 질문 비밀번호 입력 오류 상태
+  const [passwordError, setPasswordError] = useState("");
+
+  // 비공개 질문 비밀번호 검증
+  const validatePrivatePassword = (value: string) => {
+    if (!value) return "비밀번호를 입력해주세요.";
+    if (!/^\d+$/.test(value)) return "비밀번호는 숫자만 입력할 수 있습니다.";
+    if (value.length < 4) return "비밀번호는 4자리 이상 입력해주세요.";
+
+    let consecutiveCount = 1;
+    for (let i = 1; i < value.length; i++) {
+      const prev = Number(value[i - 1]);
+      const curr = Number(value[i]);
+
+      if (curr === prev + 1) {
+        consecutiveCount += 1;
+        if (consecutiveCount >= 4) {
+          return "연속된 숫자 4개 이상은 사용할 수 없습니다.";
+        }
+      } else {
+        consecutiveCount = 1;
+      }
+    }
+
+    const digitCount: Record<string, number> = {};
+    for (const ch of value) {
+      digitCount[ch] = (digitCount[ch] || 0) + 1;
+      if (digitCount[ch] >= 3) {
+        return "같은 숫자는 3개 이상 사용할 수 없습니다.";
+      }
+    }
+
+    return "";
+  };
+
+  const handlePrivatePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const onlyNumbers = e.target.value.replace(/\D/g, "");
+    setNewQuestion({ ...newQuestion, password: onlyNumbers });
+    setPasswordError(validatePrivatePassword(onlyNumbers));
+  };
+
   const handleComplexClick = (complexId: string) => {
+    
     // 단지 선택 시 메시지 표시 개수 초기화
     setSelectedComplex(complexId);
     setVisibleMessagesCount(4);
@@ -834,20 +876,25 @@ export function CommunityPage() {
                   />
                 </div>
                 {/* 비공개 비밀번호 */}
-                {newQuestion.isPrivate && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      비밀번호 <span className="text-red-500 text-xs">*비공개 필수 (비밀번호는 관리되지 않으니 필히 기억 하시기 바랍니다.)</span>
-                    </label>
-                    <Input
-                      type="password"
-                      placeholder="비밀번호를 설정하세요 (내용 확인 시 사용)"
-                      value={newQuestion.password}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, password: e.target.value })}
-                      maxLength={20}
-                    />
-                  </div>
-                )}
+            {newQuestion.isPrivate && (
+                <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  비밀번호 <span className="text-red-500 text-xs">*비공개 필수 (비밀번호는 관리되지 않으니 필히 기억 하시기 바랍니다.)</span>
+                </label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="\d*"
+                  placeholder="숫자 비밀번호를 설정하세요 (내용 확인 시 사용)"
+                  value={newQuestion.password}
+                  onChange={handlePrivatePasswordChange}
+                  maxLength={20}
+                />
+             {passwordError && (
+                <p className="mt-2 text-sm text-red-500">{passwordError}</p>
+              )}
+           </div>
+         )}
                 {/* 내용 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
