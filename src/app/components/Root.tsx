@@ -546,15 +546,24 @@ export function Root() {
             <div>
               <h2 className="font-bold text-gray-900 mb-3">공지사항</h2>
               <p className="text-sm text-gray-600">
-                ⚠️ 시민광장톡톡 문의는 SMS 인증 후 가능합니다.
-                <br />
-                개인정보는 수집 하지 않습니다.
+                ⚠️ 시민광장톡톡 문의는 SMS 인증 후 가능합니다.                             
               </p>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
-            <p>© 2026 성남시 재개발·재건축 "톡톡". All rights reserved.</p>
-          </div>
+  <div className="mb-3">
+    <a
+      href="/privacy-policy.html"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 underline hover:text-blue-800"
+      aria-label="개인정보처리방침 새창 열기"
+    >
+      개인정보처리방침
+    </a>
+  </div>
+  <p>© 2026 성남시 재개발·재건축 "톡톡". All rights reserved.</p>
+</div>
         </div>
       </footer>
 
