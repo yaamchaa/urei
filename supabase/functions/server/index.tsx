@@ -92,6 +92,28 @@ function getBearerToken(c: any) {
   return authHeader.slice(7).trim();
 }
 
+// 클라이언트 IP 추출
+function getClientIp(c: any): string {
+  const cfConnectingIp = c.req.header("cf-connecting-ip");
+  const xRealIp = c.req.header("x-real-ip");
+  const xForwardedFor = c.req.header("x-forwarded-for");
+
+  if (cfConnectingIp?.trim()) {
+    return cfConnectingIp.trim();
+  }
+
+  if (xRealIp?.trim()) {
+    return xRealIp.trim();
+  }
+
+  if (xForwardedFor) {
+    const firstIp = xForwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  return "unknown";
+}
+
 // 🔒 CSRF 토큰 생성
 function generateCsrfToken(): string {
   return crypto.randomUUID();
