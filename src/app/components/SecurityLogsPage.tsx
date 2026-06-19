@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { Shield, RefreshCw, Search, AlertCircle, CheckCircle2, LogIn, UserPlus, Upload, Edit, Trash2 } from "lucide-react";
+import {
+  Shield,
+  RefreshCw,
+  Search,
+  AlertCircle,
+  LogIn,
+  UserPlus,
+  Upload,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -22,6 +30,8 @@ export function SecurityLogsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAction, setFilterAction] = useState<string>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     fetchLogs();
@@ -29,7 +39,7 @@ export function SecurityLogsPage() {
 
   useEffect(() => {
     filterLogs();
-  }, [logs, searchTerm, filterAction]);
+  }, [logs, searchTerm, filterAction, startDate, endDate]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -66,6 +76,18 @@ export function SecurityLogsPage() {
       filtered = filtered.filter((log) => log.action === filterAction);
     }
 
+    // 시작일 필터
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00`);
+      filtered = filtered.filter((log) => new Date(log.timestamp) >= start);
+    }
+
+    // 종료일 필터
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59.999`);
+      filtered = filtered.filter((log) => new Date(log.timestamp) <= end);
+    }
+
     // 검색어 필터
     if (searchTerm) {
       filtered = filtered.filter((log) => {
@@ -73,12 +95,20 @@ export function SecurityLogsPage() {
         return (
           log.adminId.toLowerCase().includes(searchLower) ||
           log.action.toLowerCase().includes(searchLower) ||
-          JSON.stringify(log.details).toLowerCase().includes(searchLower)
+          log.ipAddress.toLowerCase().includes(searchLower) ||
+          JSON.stringify(log.details || {}).toLowerCase().includes(searchLower)
         );
       });
     }
 
     setFilteredLogs(filtered);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setFilterAction("all");
+    setStartDate("");
+    setEndDate("");
   };
 
   const getActionIcon = (action: string) => {
@@ -147,45 +177,31 @@ export function SecurityLogsPage() {
           </p>
         </div>
         <Button onClick={fetchLogs} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+          />
           새로고침
         </Button>
       </div>
 
-      {/* 필터 및 검색 */}
+      {/* 액션 필터만 유지 */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
-                검색
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="관리자 ID, 액션, 상세정보 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
-                액션 필터
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {actionTypes.map((type) => (
-                  <Button
-                    key={type.value}
-                    variant={filterAction === type.value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilterAction(type.value)}
-                  >
-                    {type.label}
-                  </Button>
-                ))}
-              </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              액션 필터
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {actionTypes.map((type) => (
+                <Button
+                  key={type.value}
+                  variant={filterAction === type.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterAction(type.value)}
+                >
+                  {type.label}
+                </Button>
+              ))}
             </div>
           </div>
         </CardContent>
@@ -197,10 +213,13 @@ export function SecurityLogsPage() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-sm text-gray-500">전체 로그</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{logs.length}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {logs.length}
+              </p>
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -211,6 +230,7 @@ export function SecurityLogsPage() {
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -221,6 +241,7 @@ export function SecurityLogsPage() {
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -235,9 +256,62 @@ export function SecurityLogsPage() {
 
       {/* 로그 목록 */}
       <Card>
-        <CardHeader>
-          <CardTitle>활동 기록</CardTitle>
+        <CardHeader className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+          <div>
+            <CardTitle>활동 기록</CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              기간과 검색어로 원하는 보안 활동 기록을 확인할 수 있습니다.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                시작일
+              </label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full sm:w-[160px]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                종료일
+              </label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full sm:w-[160px]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                검색
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="관리자 ID, 액션, IP, 상세정보 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full sm:w-[280px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-end">
+              <Button type="button" variant="outline" onClick={resetFilters}>
+                초기화
+              </Button>
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent>
           {loading ? (
             <div className="text-center py-12">
@@ -247,7 +321,7 @@ export function SecurityLogsPage() {
           ) : filteredLogs.length === 0 ? (
             <div className="text-center py-12">
               <Shield className="w-12 h-12 mx-auto text-gray-300" />
-              <p className="text-gray-500 mt-2">로그가 없습니다.</p>
+              <p className="text-gray-500 mt-2">조건에 맞는 로그가 없습니다.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -260,22 +334,27 @@ export function SecurityLogsPage() {
                     <div className="flex items-start gap-3 flex-1">
                       <div className="mt-1">{getActionIcon(log.action)}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           {getActionBadge(log.action)}
                           <span className="text-xs text-gray-500">
                             {formatDate(log.timestamp)}
                           </span>
                         </div>
+
                         <p className="text-sm text-gray-700 mb-1">
                           <span className="font-medium">관리자:</span> {log.adminId}
                         </p>
+
                         <p className="text-sm text-gray-700 mb-1">
                           <span className="font-medium">IP:</span> {log.ipAddress}
                         </p>
+
                         {log.details && Object.keys(log.details).length > 0 && (
                           <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                            <p className="font-medium text-gray-700 mb-1">상세정보:</p>
-                            <pre className="text-gray-600 overflow-x-auto">
+                            <p className="font-medium text-gray-700 mb-1">
+                              상세정보:
+                            </p>
+                            <pre className="text-gray-600 overflow-x-auto whitespace-pre-wrap break-words">
                               {JSON.stringify(log.details, null, 2)}
                             </pre>
                           </div>
