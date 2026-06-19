@@ -138,7 +138,7 @@ export function SettingsPage() {
 
     const normalizedSender = aligoForm.sender.replace(/-/g, "").trim();
 
-    if (!/^01[016789]\d{7,8}$/.test(normalizedSender)) {
+    if (!/^\d{9,11}$/.test(normalizedSender)) {
       setAligoSaveMsg({
         type: "error",
         text: "발신번호는 알리고에 등록된 발신번호를 정확히 입력해주세요. (예: 01012345678)",
