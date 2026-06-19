@@ -3001,14 +3001,21 @@ app.post("/make-server-66444bd0/images/upload", async (c) => {
     await kvSet(key, metaData);
 
     // 📝 이미지 업로드 로그 기록
-    if (adminId) {
-      await logAdminActivity(adminId, "IMAGE_UPLOAD", {
-        complex_id,
-        image_type,
-        file_size: bytes.length,
-        mime_type: mimeType,
-      });
-    }
+if (adminId) {
+  const clientIp = getClientIp(c);
+
+  await logAdminActivity(
+    adminId,
+    "IMAGE_UPLOAD",
+    {
+      complex_id,
+      image_type,
+      file_size: bytes.length,
+      mime_type: mimeType,
+    },
+    clientIp,
+  );
+}
 
     console.log(`✅ 이미지 업로드 완료: ${filePath}`);
 
@@ -3225,13 +3232,20 @@ if (!validateAdminPhoneNumber(normalizedPhone)) {
     });
 
     // 📝 관리자 활동 로그 기록
-    await logAdminActivity(adminId, "ADMIN_REGISTER", {
-      name,
-      department,
-      phone: normalizedPhone,
-      isPrimaryAdmin: false,
-      isActive: true,
-    });
+const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  adminId,
+  "ADMIN_REGISTER",
+  {
+    name,
+    department,
+    phone: normalizedPhone,
+    isPrimaryAdmin: false,
+    isActive: true,
+  },
+  clientIp,
+);
 
     console.log("✅ 관리자 등록 완료:", adminId);
 
@@ -3338,16 +3352,24 @@ if (!checkRateLimit(`login:${normalizedPhone}`, 5, 60000)) {
 
     // 🔒 계정 활성 상태 확인
     if (normalizedAdminData.isActive === false) {
-      await logAdminActivity(adminId, "LOGIN_BLOCKED", {
-        phone: normalizedPhone,
-        reason: "비활성화된 계정",
-      });
-      console.log("login fail: inactive account");
-      return c.json(
-        { error: "비활성화된 관리자 계정입니다." },
-        403,
-      );
-    }
+  const clientIp = getClientIp(c);
+
+  await logAdminActivity(
+    adminId,
+    "LOGIN_BLOCKED",
+    {
+      phone: normalizedPhone,
+      reason: "비활성화된 계정",
+    },
+    clientIp,
+  );
+
+  console.log("login fail: inactive account");
+  return c.json(
+    { error: "비활성화된 관리자 계정입니다." },
+    403,
+  );
+}
 
     // 비밀번호 확인
 const storedHash =
@@ -3356,10 +3378,18 @@ const storedHash =
   "";
 
 if (!storedHash) {
-  await logAdminActivity(adminId, "LOGIN_FAILED", {
-    phone: normalizedPhone,
-    reason: "저장된 비밀번호 해시 없음",
-  });
+  const clientIp = getClientIp(c);
+
+  await logAdminActivity(
+    adminId,
+    "LOGIN_FAILED",
+    {
+      phone: normalizedPhone,
+      reason: "저장된 비밀번호 해시 없음",
+    },
+    clientIp,
+  );
+
   console.log("login fail: stored hash missing");
   return c.json(
     { error: "관리자 비밀번호 정보가 올바르지 않습니다." },
@@ -3398,10 +3428,18 @@ console.log("password compare result:", passwordOk, {
 
 if (!passwordOk) {
   // 📝 로그인 실패 로그 기록
-  await logAdminActivity(adminId, "LOGIN_FAILED", {
-    phone: normalizedPhone,
-    reason: "잘못된 비밀번호",
-  });
+  const clientIp = getClientIp(c);
+
+  await logAdminActivity(
+    adminId,
+    "LOGIN_FAILED",
+    {
+      phone: normalizedPhone,
+      reason: "잘못된 비밀번호",
+    },
+    clientIp,
+  );
+
   console.log("login fail: wrong password");
   return c.json(
     { error: "비밀번호가 일치하지 않습니다." },
@@ -3429,12 +3467,19 @@ if (matchedWithoutPepper) {
     console.log("✅ 관리자 로그인 성공:", adminId);
 
     // 📝 로그인 성공 로그 기록
-    await logAdminActivity(adminId, "LOGIN_SUCCESS", {
-      name: normalizedAdminData.name,
-      department: normalizedAdminData.department,
-      isPrimaryAdmin: normalizedAdminData.isPrimaryAdmin,
-      isActive: normalizedAdminData.isActive,
-    });
+    const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  adminId,
+  "LOGIN_SUCCESS",
+  {
+    name: normalizedAdminData.name,
+    department: normalizedAdminData.department,
+    isPrimaryAdmin: normalizedAdminData.isPrimaryAdmin,
+    isActive: normalizedAdminData.isActive,
+  },
+  clientIp,
+);
 
     // 로그인 기록 저장 (기존 방식 유지)
     const loginLogId = `log_${Date.now()}`;
@@ -3572,24 +3617,31 @@ if (oldPhone !== normalizedPhone) {
   await kvSet(`admin_phone:${normalizedPhone}`, adminId);
 }
 
-    await logAdminActivity(adminId, "PROFILE_UPDATED", {
-      before: {
-        name: existingAdmin.name,
-        department: existingAdmin.department,
-        phone: existingAdmin.phone,
-        isPrimaryAdmin: existingAdmin.isPrimaryAdmin === true,
-      },
-      after: {
-        name: updatedAdmin.name,
-        department: updatedAdmin.department,
-        phone: updatedAdmin.phone,
-        isPrimaryAdmin: updatedAdmin.isPrimaryAdmin,
-      },
-      changedFields: {
-        phone: oldPhone !== normalizedPhone,
-        password: !!trimmedPassword,
-      },
-    });
+    const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  adminId,
+  "PROFILE_UPDATED",
+  {
+    before: {
+      name: existingAdmin.name,
+      department: existingAdmin.department,
+      phone: existingAdmin.phone,
+      isPrimaryAdmin: existingAdmin.isPrimaryAdmin === true,
+    },
+    after: {
+      name: updatedAdmin.name,
+      department: updatedAdmin.department,
+      phone: updatedAdmin.phone,
+      isPrimaryAdmin: updatedAdmin.isPrimaryAdmin,
+    },
+    changedFields: {
+      phone: oldPhone !== normalizedPhone,
+      password: !!trimmedPassword,
+    },
+  },
+  clientIp,
+);
 
     const {
       passwordHash: _,
@@ -3679,11 +3731,20 @@ app.delete(
         await kvDel(`admin_phone:${adminData.phone}`);
       }
 
-      await logAdminActivity(adminId, "ADMIN_DELETED", {
-        name: adminData.name,
-        department: adminData.department,
-        phone: adminData.phone,
-      });
+      const actorAdminId = authResult.adminSession.adminId;
+const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  actorAdminId,
+  "ADMIN_DELETED",
+  {
+    deletedAdminId: adminId,
+    name: adminData.name,
+    department: adminData.department,
+    phone: adminData.phone,
+  },
+  clientIp,
+);
 
       return c.json({
         success: true,
@@ -4675,7 +4736,7 @@ app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
       return c.json({ error: "apiKey, userId, sender 모두 필요합니다." }, 400);
     }
 
-    if (!/^01[016789]\d{7,8}$/.test(sender.replace(/-/g, ""))) {
+    if (!/^\d{9,11}$/.test(sender.replace(/-/g, ""))) {
       return c.json({ error: "올바른 발신번호 형식이 아닙니다." }, 400);
     }
 
@@ -4687,10 +4748,17 @@ app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
       updatedBy: adminId,
     });
 
-    await logAdminActivity(adminId, "sms_config_updated", {
-      userId: sanitizeHtml(userId.trim()),
-      sender: sender.replace(/-/g, "").trim(),
-    });
+    const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  adminId,
+  "sms_config_updated",
+  {
+    userId: sanitizeHtml(userId.trim()),
+    sender: sender.replace(/-/g, "").trim(),
+  },
+  clientIp,
+);
 
     return c.json({
       success: true,
@@ -4820,9 +4888,16 @@ app.post("/make-server-66444bd0/sms-auth/test", async (c) => {
     const testOtp = generateOtp();
     await sendAligoSms(phone, `[성남시 개발 톡톡] 테스트 인증번호: ${testOtp}`, config);
 
-    await logAdminActivity(adminId, "sms_test_sent", {
-      targetPhone: phone,
-    });
+    const clientIp = getClientIp(c);
+
+await logAdminActivity(
+  adminId,
+  "sms_test_sent",
+  {
+    targetPhone: phone,
+  },
+  clientIp,
+);
 
     return c.json({ success: true });
   } catch (error: any) {
