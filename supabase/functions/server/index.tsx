@@ -13,6 +13,77 @@ const PASSWORD_PEPPER = Deno.env.get("PASSWORD_PEPPER") || "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
 // ========================================
+// AES-256-GCM 개인정보 암호화 (성남시 보안 요건)
+// DB_ENCRYPTION_KEY: Supabase Edge Function Secrets에 32자 이상 설정
+// ========================================
+const DB_ENCRYPTION_KEY = Deno.env.get("DB_ENCRYPTION_KEY") || "";
+const ENC_PREFIX = "enc:";
+
+async function aesEncrypt(plaintext: string): Promise<string> {
+  if (!DB_ENCRYPTION_KEY || !plaintext) return plaintext;
+  try {
+    const keyBytes = new TextEncoder().encode(
+      DB_ENCRYPTION_KEY.padEnd(32, "0").slice(0, 32),
+    );
+    const key = await crypto.subtle.importKey(
+      "raw",
+      keyBytes,
+      { name: "AES-GCM" },
+      false,
+      ["encrypt"],
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      new TextEncoder().encode(plaintext),
+    );
+    const combined = new Uint8Array(12 + ciphertext.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(ciphertext), 12);
+    return ENC_PREFIX + btoa(String.fromCharCode(...combined));
+  } catch {
+    return plaintext;
+  }
+}
+
+async function aesDecrypt(encrypted: string): Promise<string> {
+  if (!DB_ENCRYPTION_KEY || !encrypted || !encrypted.startsWith(ENC_PREFIX)) {
+    return encrypted; // 평문 또는 키 미설정 시 그대로 반환
+  }
+  try {
+    const keyBytes = new TextEncoder().encode(
+      DB_ENCRYPTION_KEY.padEnd(32, "0").slice(0, 32),
+    );
+    const key = await crypto.subtle.importKey(
+      "raw",
+      keyBytes,
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"],
+    );
+    const combined = Uint8Array.from(atob(encrypted.slice(ENC_PREFIX.length)), (c) =>
+      c.charCodeAt(0),
+    );
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext,
+    );
+    return new TextDecoder().decode(plaintext);
+  } catch {
+    return encrypted;
+  }
+}
+
+// 전화번호 KV 키 해시 (단방향 SHA-256 — KV 키에 전화번호 평문 노출 방지)
+async function hashPhoneForKey(phone: string): Promise<string> {
+  return "ph:" + (await sha256Hex("phonekey:" + phone)).slice(0, 24);
+}
+
+// ========================================
 // KV Store Functions (inline)
 // ========================================
 const kvClient = () =>
@@ -3191,9 +3262,9 @@ if (!validateAdminPhoneNumber(normalizedPhone)) {
       );
     }
 
-    // 전화번호 중복 확인
-    const phoneKey = `admin_phone:${normalizedPhone}`;
-    const existingAdmin = await kvGet(phoneKey);
+    // 전화번호 중복 확인 (해시 키로 조회)
+    const hashedPhoneKey = `admin_phone:${await hashPhoneForKey(normalizedPhone)}`;
+    const existingAdmin = await kvGet(hashedPhoneKey);
 
     if (existingAdmin) {
       return c.json(
@@ -3212,16 +3283,16 @@ if (!validateAdminPhoneNumber(normalizedPhone)) {
       id: adminId,
       name,
       department,
-      phone: normalizedPhone,
+      phone: await aesEncrypt(normalizedPhone), // AES-256-GCM 암호화
       passwordHash,
       isPrimaryAdmin: false,
       isActive: true,
       createdAt: new Date().toISOString(),
     };
 
-    // KV store에 저장
+    // KV store에 저장 (전화번호 인덱스 키는 SHA-256 해시)
     await kvSet(`admin:${adminId}`, adminData);
-    await kvSet(phoneKey, adminId);
+    await kvSet(hashedPhoneKey, adminId);
 
     // 인증번호 사용 처리
     await kvSet(authCodeKey, {
@@ -3300,10 +3371,29 @@ if (!checkRateLimit(`login:${normalizedPhone}`, 5, 60000)) {
   );
 }
 
-    // 전화번호로 관리자 ID 조회
-    const phoneKey = `admin_phone:${normalizedPhone}`;
-    const adminId = await kvGet(phoneKey);
-    console.log("phoneKey result:", adminId);
+    // 전화번호로 관리자 ID 조회 (해시 키 우선, 레거시 평문 키 자동 마이그레이션)
+    const hashedKey = `admin_phone:${await hashPhoneForKey(normalizedPhone)}`;
+    let adminId = await kvGet(hashedKey);
+    if (!adminId) {
+      // 레거시 평문 키 fallback
+      const legacyKey = `admin_phone:${normalizedPhone}`;
+      const legacyId = await kvGet(legacyKey);
+      if (legacyId) {
+        // 자동 마이그레이션: 해시 키로 전환, 평문 키 삭제
+        await kvSet(hashedKey, legacyId);
+        await kvDel(legacyKey);
+        // admin 데이터 phone 필드도 암호화
+        const legacyAdmin = await kvGet(`admin:${legacyId}`);
+        if (legacyAdmin && !String(legacyAdmin.phone || "").startsWith(ENC_PREFIX)) {
+          await kvSet(`admin:${legacyId}`, {
+            ...legacyAdmin,
+            phone: await aesEncrypt(legacyAdmin.phone || ""),
+          });
+        }
+        adminId = legacyId;
+      }
+    }
+    console.log("phoneKey result:", adminId ? "found" : "not found");
 
     if (!adminId) {
       console.log("login fail: unregistered phone");
@@ -3508,11 +3598,11 @@ await logAdminActivity(
     // 🔒 CSRF 토큰 생성
     const csrfToken = generateCsrfToken();
 
-    // 관리자 세션 저장
+    // 관리자 세션 저장 (phone은 평문으로 세션에 저장 — 세션은 랜덤 UUID 키로 보호)
     await kvSet(`admin_session:${adminApiToken}`, {
       adminId: adminId,
       name: normalizedAdminData.name,
-      phone: normalizedAdminData.phone,
+      phone: normalizedPhone, // 입력받은 평문 전화번호 (DB 암호문 대신)
       department: normalizedAdminData.department,
       isPrimaryAdmin: normalizedAdminData.isPrimaryAdmin,
       isActive: normalizedAdminData.isActive,
@@ -3520,16 +3610,16 @@ await logAdminActivity(
       createdAt: new Date().toISOString(),
     });
 
-    // 비밀번호 제외하고 반환
+    // 비밀번호 제외하고 반환 (phone은 복호화된 평문으로)
     const {
       passwordHash: _,
       password: __,
-      ...adminInfo
+      ...adminInfoRaw
     } = normalizedAdminData;
 
     return c.json({
       success: true,
-      admin: adminInfo,
+      admin: { ...adminInfoRaw, phone: normalizedPhone },
       adminApiToken,
       csrfToken, // 🔒 CSRF 토큰 클라이언트에 반환
     });
@@ -3561,10 +3651,12 @@ app.put("/make-server-66444bd0/admin/profile", async (c) => {
       );
     }
 
+    // 기존 전화번호 복호화 (AES-256-GCM 또는 레거시 평문)
+    const decryptedExistingPhone = await aesDecrypt(existingAdmin.phone || "");
     const normalizedPhone =
   typeof phone === "string"
     ? normalizePhoneNumber(phone)
-    : normalizePhoneNumber(existingAdmin.phone || "");
+    : normalizePhoneNumber(decryptedExistingPhone);
 const trimmedPassword =
   typeof password === "string" ? password.trim() : "";
 
@@ -3579,11 +3671,11 @@ if (!validateAdminPhoneNumber(normalizedPhone)) {
   );
 }
 
-const oldPhone = normalizePhoneNumber(existingAdmin.phone || "");
+const oldPhone = normalizePhoneNumber(decryptedExistingPhone);
 
 if (oldPhone !== normalizedPhone) {
-  const newPhoneKey = `admin_phone:${normalizedPhone}`;
-  const phoneOwner = await kvGet(newPhoneKey);
+  const newHashedPhoneKey = `admin_phone:${await hashPhoneForKey(normalizedPhone)}`;
+  const phoneOwner = await kvGet(newHashedPhoneKey);
 
       if (phoneOwner && phoneOwner !== adminId) {
         return c.json(
@@ -3595,7 +3687,7 @@ if (oldPhone !== normalizedPhone) {
 
     const updatedAdmin = {
       ...existingAdmin,
-      phone: normalizedPhone,
+      phone: await aesEncrypt(normalizedPhone), // AES-256-GCM 암호화
       ...(trimmedPassword
         ? {
             passwordHash: await bcrypt.hash(
@@ -3613,8 +3705,10 @@ if (oldPhone !== normalizedPhone) {
     await kvSet(adminKey, updatedAdmin);
 
     if (oldPhone && oldPhone !== normalizedPhone) {
+  await kvDel(`admin_phone:${await hashPhoneForKey(oldPhone)}`);
+  // 레거시 평문 키도 정리
   await kvDel(`admin_phone:${oldPhone}`);
-  await kvSet(`admin_phone:${normalizedPhone}`, adminId);
+  await kvSet(`admin_phone:${await hashPhoneForKey(normalizedPhone)}`, adminId);
 }
 
     const clientIp = getClientIp(c);
@@ -3626,13 +3720,13 @@ await logAdminActivity(
     before: {
       name: existingAdmin.name,
       department: existingAdmin.department,
-      phone: existingAdmin.phone,
+      phone: oldPhone, // 복호화된 평문 (로그용)
       isPrimaryAdmin: existingAdmin.isPrimaryAdmin === true,
     },
     after: {
       name: updatedAdmin.name,
       department: updatedAdmin.department,
-      phone: updatedAdmin.phone,
+      phone: normalizedPhone, // 복호화된 평문 (로그용)
       isPrimaryAdmin: updatedAdmin.isPrimaryAdmin,
     },
     changedFields: {
@@ -3652,7 +3746,7 @@ await logAdminActivity(
     return c.json({
       success: true,
       message: "프로필이 수정되었습니다.",
-      admin: adminInfo,
+      admin: { ...adminInfo, phone: normalizedPhone }, // 복호화된 전화번호 반환
     });
   } catch (error: any) {
     console.error("Admin profile update error:", error);
@@ -3667,22 +3761,26 @@ app.get("/make-server-66444bd0/admin/accounts", async (c) => {
   try {
     const admins = await kvGetByPrefix("admin:");
 
-    const normalizedAdmins = (admins || [])
-      .filter((admin) => admin && admin.id && admin.phone)
-      .map((admin) => {
-        const { password: _, ...adminInfo } = admin;
+    const rawAdmins = (admins || []).filter((admin) => admin && admin.id && admin.phone);
 
+    // 전화번호 AES-256-GCM 복호화
+    const decryptedAdmins = await Promise.all(
+      rawAdmins.map(async (admin) => {
+        const { password: _, passwordHash: __, ...adminInfo } = admin;
         return {
           ...adminInfo,
+          phone: await aesDecrypt(admin.phone || ""),
           isPrimaryAdmin: admin.isPrimaryAdmin === true,
           isActive: admin.isActive !== false,
         };
-      })
-      .sort((a, b) => {
-        const timeA = new Date(a.createdAt || 0).getTime();
-        const timeB = new Date(b.createdAt || 0).getTime();
-        return timeB - timeA;
-      });
+      }),
+    );
+
+    const normalizedAdmins = decryptedAdmins.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
 
     return c.json({
       success: true,
@@ -3728,7 +3826,10 @@ app.delete(
       await kvDel(adminKey);
 
       if (adminData.phone) {
-        await kvDel(`admin_phone:${adminData.phone}`);
+        const decryptedPhone = await aesDecrypt(adminData.phone);
+        // 해시 키 삭제 (신규) + 레거시 평문 키 삭제 (구형)
+        await kvDel(`admin_phone:${await hashPhoneForKey(decryptedPhone)}`);
+        await kvDel(`admin_phone:${decryptedPhone}`);
       }
 
       const actorAdminId = authResult.adminSession.adminId;
@@ -4712,11 +4813,14 @@ app.get("/make-server-66444bd0/sms-auth/config", async (c) => {
     if (!config) {
       return c.json({ isConfigured: false, apiKeyMasked: "", userId: "", sender: "" });
     }
+    // 복호화 후 마스킹해서 반환 (평문 apiKey/sender는 절대 반환하지 않음)
+    const decApiKey = await aesDecrypt(config.apiKey || "");
+    const decSender = await aesDecrypt(config.sender || "");
     return c.json({
       isConfigured: true,
-      apiKeyMasked: (config.apiKey || "").slice(-4),
+      apiKeyMasked: decApiKey.slice(-4),
       userId: config.userId || "",
-      sender: config.sender || "",
+      sender: decSender,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -4740,10 +4844,14 @@ app.post("/make-server-66444bd0/sms-auth/config", async (c) => {
       return c.json({ error: "올바른 발신번호 형식이 아닙니다." }, 400);
     }
 
+    const cleanApiKey = sanitizeHtml(apiKey.trim());
+    const cleanUserId = sanitizeHtml(userId.trim());
+    const cleanSender = sender.replace(/-/g, "").trim();
+
     await kvSet("sms_aligo_config", {
-      apiKey: sanitizeHtml(apiKey.trim()),
-      userId: sanitizeHtml(userId.trim()),
-      sender: sender.replace(/-/g, "").trim(),
+      apiKey: await aesEncrypt(cleanApiKey), // AES-256-GCM 암호화
+      userId: cleanUserId,
+      sender: await aesEncrypt(cleanSender), // AES-256-GCM 암호화
       updatedAt: new Date().toISOString(),
       updatedBy: adminId,
     });
@@ -4754,8 +4862,8 @@ await logAdminActivity(
   adminId,
   "sms_config_updated",
   {
-    userId: sanitizeHtml(userId.trim()),
-    sender: sender.replace(/-/g, "").trim(),
+    userId: cleanUserId,
+    sender: cleanSender,
   },
   clientIp,
 );
@@ -4764,9 +4872,9 @@ await logAdminActivity(
       success: true,
       config: {
         isConfigured: true,
-        apiKeyMasked: apiKey.trim().slice(-4),
-        userId: userId.trim(),
-        sender: sender.replace(/-/g, "").trim(),
+        apiKeyMasked: cleanApiKey.slice(-4),
+        userId: cleanUserId,
+        sender: cleanSender,
       },
     });
   } catch (error: any) {
@@ -4811,25 +4919,33 @@ app.post("/make-server-66444bd0/sms-auth/send", async (c) => {
       return c.json({ error: "올바른 휴대폰 번호를 입력해주세요." }, 400);
     }
 
-    // Rate limit: 같은 번호로 1분에 3회 이상 불가
-    if (!checkRateLimit(`sms_otp:${phone}`, 3, 60000)) {
+    // 전화번호 해시 (KV 키에 평문 노출 방지)
+    const phoneHash = await hashPhoneForKey(phone);
+
+    // Rate limit: 같은 번호로 1분에 3회 이상 불가 (해시 키 사용)
+    if (!checkRateLimit(`sms_rate:${phoneHash}`, 3, 60000)) {
       return c.json({ error: "잠시 후 다시 시도해주세요. (1분에 최대 3회)" }, 429);
     }
 
-    // 알리고 설정 확인
+    // 알리고 설정 확인 + API Key 복호화
     const config = await kvGet("sms_aligo_config");
     if (!config?.apiKey) {
       return c.json({ code: "SMS_NOT_CONFIGURED", error: "SMS 서비스 설정이 필요합니다." }, 503);
     }
+    const decryptedConfig = {
+      apiKey: await aesDecrypt(config.apiKey),
+      userId: config.userId,
+      sender: await aesDecrypt(config.sender),
+    };
 
     const otp = generateOtp();
     const expireAt = Date.now() + 3 * 60 * 1000; // 3분
 
-    // OTP를 서버에 저장 (전화번호별, 3분 후 자동 만료)
-    await kvSet(`sms_otp:${phone}`, { otp, expireAt, createdAt: new Date().toISOString() });
+    // OTP를 서버에 저장 (키: 전화번호 SHA-256 해시 — 전화번호 평문 미노출)
+    await kvSet(`sms_otp:${phoneHash}`, { otp, expireAt, createdAt: new Date().toISOString() });
 
-    // 알리고로 SMS 발송
-    await sendAligoSms(phone, `[성남시 개발 톡톡] 인증번호: ${otp} (3분 이내 입력)`, config);
+    // 알리고로 SMS 발송 (복호화된 설정 사용)
+    await sendAligoSms(phone, `[성남시 개발 톡톡] 인증번호: ${otp} (3분 이내 입력)`, decryptedConfig);
 
     return c.json({ success: true });
   } catch (error: any) {
@@ -4846,12 +4962,14 @@ app.post("/make-server-66444bd0/sms-auth/verify", async (c) => {
       return c.json({ error: "phone과 otp가 필요합니다." }, 400);
     }
 
-    const stored = await kvGet(`sms_otp:${phone}`);
+    // 전화번호 해시로 KV 조회 (평문 노출 방지)
+    const phoneHash = await hashPhoneForKey(phone);
+    const stored = await kvGet(`sms_otp:${phoneHash}`);
     if (!stored) {
       return c.json({ code: "OTP_EXPIRED", error: "인증번호가 만료되었습니다. 다시 발송해주세요." }, 401);
     }
     if (Date.now() > stored.expireAt) {
-      await kvDel(`sms_otp:${phone}`);
+      await kvDel(`sms_otp:${phoneHash}`);
       return c.json({ code: "OTP_EXPIRED", error: "인증번호가 만료되었습니다. 다시 발송해주세요." }, 401);
     }
     if (stored.otp !== otp) {
@@ -4859,7 +4977,7 @@ app.post("/make-server-66444bd0/sms-auth/verify", async (c) => {
     }
 
     // 검증 성공 → OTP 삭제
-    await kvDel(`sms_otp:${phone}`);
+    await kvDel(`sms_otp:${phoneHash}`);
     return c.json({ success: true });
   } catch (error: any) {
     console.error("OTP verify error:", error);
@@ -4884,9 +5002,14 @@ app.post("/make-server-66444bd0/sms-auth/test", async (c) => {
     if (!config?.apiKey) {
       return c.json({ code: "SMS_NOT_CONFIGURED", error: "알리고 API Key가 설정되지 않았습니다." }, 503);
     }
+    const decryptedTestConfig = {
+      apiKey: await aesDecrypt(config.apiKey),
+      userId: config.userId,
+      sender: await aesDecrypt(config.sender),
+    };
 
     const testOtp = generateOtp();
-    await sendAligoSms(phone, `[성남시 개발 톡톡] 테스트 인증번호: ${testOtp}`, config);
+    await sendAligoSms(phone, `[성남시 개발 톡톡] 테스트 인증번호: ${testOtp}`, decryptedTestConfig);
 
     const clientIp = getClientIp(c);
 
